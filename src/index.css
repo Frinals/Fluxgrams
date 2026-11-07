@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Hide Bolt platform badge */
+.bolt-badge, [class*="bolt-badge"], a[href*="bolt.new"] > img,
+div[class*="Badge"][class*="bolt"], #bolt-badge {
+  display: none !important;
+}
+
+@layer base {
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-attachment: fixed;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Momentum scrolling on all scrollable areas */
+  .scroll-smooth-touch {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+}
+
+@layer components {
+  /* Core liquid glass panel — extreme glassmorphism */
+  .glass-panel {
+    background: var(--app-glass);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid var(--app-border-glass);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.18),
+      0 2px 8px rgba(0, 0, 0, 0.08),
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.15),
+      inset 0 -1px 1px 0 rgba(0, 0, 0, 0.06);
+  }
+
+  /* Glass nav bar — more opaque for readability, stronger blur */
+  .glass-nav {
+    background: var(--app-nav-bg);
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid var(--app-border-glass);
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.1),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+  }
+
+  /* Glass card — for list items, chat rows */
+  .glass-card {
+    background: var(--app-glass);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    border: 1px solid var(--app-border-glass);
+  }
+
+  /* Glass input field */
+  .glass-input {
+    background: var(--app-surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--app-border);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Liquid gradient orbs — large, vibrant, animated background blobs */
+  .liquid-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(48px);
+    opacity: 0.3;
+    pointer-events: none;
+    animation: liquid-float 18s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  @keyframes liquid-float {
+    0%, 100% {
+      transform: translate(0, 0) scale(1);
+    }
+    33% {
+      transform: translate(40px, -30px) scale(1.15);
+    }
+    66% {
+      transform: translate(-25px, 20px) scale(0.9);
+    }
+  }
+
+  /* Glass shimmer — subtle light sweep on hover */
+  .glass-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .glass-shimmer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.08),
+      transparent
+    );
+    transition: left 0.7s ease;
+    pointer-events: none;
+  }
+
+  .glass-shimmer:hover::before {
+    left: 120%;
+  }
+
+  /* Floating action button — liquid glass style */
+  .fab {
+    background: var(--app-accent-gradient);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.3),
+      0 2px 8px rgba(0, 0, 0, 0.15),
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.25);
+  }
+}
+
+/* Custom scrollbar — thin, translucent, smooth */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.25);
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.4);
+  background-clip: padding-box;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.25) transparent;
+}
+
+/* Selection styling */
+::selection {
+  background: rgba(91, 124, 250, 0.25);
+}
