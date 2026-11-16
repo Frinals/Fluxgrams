@@ -21,7 +21,7 @@ interface OutgoingCallState {
   chatId: string | null;
 }
 
-const springTransition = { type: 'spring' as const, stiffness: 300, damping: 30 };
+const springTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
 function MessengerApp() {
   const { user, loading, needsEmailVerification } = useAuth();
@@ -31,7 +31,7 @@ function MessengerApp() {
   const [outgoingCall, setOutgoingCall] = useState<OutgoingCallState | null>(null);
   const [createModalType, setCreateModalType] = useState<GroupType | null>(null);
 
-  // ФИКС: Ключ для принудительного обновления списка чатов
+  // Ключ для принудительного обновления списка чатов
   const [chatRefreshKey, setChatRefreshKey] = useState(0);
   const triggerChatRefresh = () => setChatRefreshKey(prev => prev + 1);
 
@@ -48,7 +48,6 @@ function MessengerApp() {
 
   const handleGroupCreated = (groupId: string, _groupName: string, _groupType: GroupType) => {
     setCreateModalType(null);
-    // Fetch the full group and open it
     supabase
       .from('groups')
       .select('*')
@@ -57,17 +56,15 @@ function MessengerApp() {
       .then(({ data, error }) => {
         if (data && !error) {
           setOpenGroup(data as Group);
-          triggerChatRefresh(); // ФИКС: Обновляем список после создания группы
+          triggerChatRefresh(); 
         }
       });
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center"
-           style={{ background: 'var(--app-bg-gradient)' }}>
-        <div className="w-10 h-10 border-2 rounded-full animate-spin"
-             style={{ borderColor: 'var(--app-border)', borderTopColor: 'var(--app-accent)' }} />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--app-bg)' }}>
+        <div className="w-10 h-10 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--app-accent)', borderTopColor: 'transparent' }} />
       </div>
     );
   }
@@ -77,16 +74,13 @@ function MessengerApp() {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden" style={{ background: 'var(--app-bg-gradient)' }}>
-      {/* Liquid background orbs */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="liquid-orb" style={{ background: 'var(--app-accent)', width: 500, height: 500, top: '-10%', left: '-10%', opacity: 0.15 }} />
-        <div className="liquid-orb" style={{ background: 'var(--app-glow)', width: 400, height: 400, top: '30%', right: '-15%', opacity: 0.12, animationDelay: '2s' }} />
-        <div className="liquid-orb" style={{ background: 'var(--app-accent)', width: 350, height: 350, bottom: '-10%', left: '20%', opacity: 0.1, animationDelay: '4s' }} />
-      </div>
-
+    // Убрали градиенты, теперь используется цвет темы. Никаких тяжелых шаров!
+    <div className="min-h-screen relative overflow-hidden" style={{ background: 'var(--app-bg)' }}>
+      
+      {/* Глобальный обработчик входящих звонков (висит над всеми экранами) */}
       <IncomingCallModal />
 
+      {/* Модалка исходящего звонка */}
       {outgoingCall && (
         <OutgoingCallModal
           peer={outgoingCall.peer}
@@ -114,7 +108,7 @@ function MessengerApp() {
                   group={null}
                   onBack={() => {
                     setOpenChat(null);
-                    triggerChatRefresh(); // ФИКС: Обновляем список при выходе из чата
+                    triggerChatRefresh();
                   }}
                   onCall={handleCall}
                 />
@@ -134,7 +128,7 @@ function MessengerApp() {
                   group={openGroup}
                   onBack={() => {
                     setOpenGroup(null);
-                    triggerChatRefresh(); // ФИКС: Обновляем список при выходе из группы
+                    triggerChatRefresh();
                   }}
                   onCall={handleCall}
                 />
@@ -150,7 +144,7 @@ function MessengerApp() {
               >
                 {activeTab === 'chats' && (
                   <ChatList
-                    key={chatRefreshKey} // ФИКС: Заставляет список перезагрузиться
+                    key={chatRefreshKey} 
                     onOpenChat={(chatId, peer) => setOpenChat({ chatId, peer })}
                     onOpenGroup={(g) => setOpenGroup(g)}
                     onCreateGroup={handleCreateGroup}
@@ -172,7 +166,6 @@ function MessengerApp() {
 
       {!openChat && !openGroup && <BottomNav active={activeTab} onChange={setActiveTab} />}
 
-      {/* Create Group/Channel Modal */}
       <AnimatePresence>
         {createModalType && (
           <CreateGroupModal
