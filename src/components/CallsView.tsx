@@ -1,140 +1,312 @@
-import { useState, useEffect, useCallback, memo } from 'react';
-import { supabase, Call, Profile } from '@/lib/supabase';
+import { useState, useEffect, useRef, useCallback, FormEvent, memo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { supabase, Profile, Message, Reaction, Group } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { PhoneIncomingIcon, PhoneOutgoingIcon, PhoneOffIcon, VideoIcon } from '@/components/Icons';
+import { encryptMessage, decryptMessage } from '@/lib/crypto';
+import { UserProfileModal } from '@/components/UserProfileModal';
+import {
+  BackIcon, SendIcon, MicIcon, ImageIcon, VideoUploadIcon, PhoneIcon, VideoIcon,
+  TimerIcon, PlayIcon, PauseIcon, TrashIcon, BookmarkIcon, ShieldIcon,
+  GroupIcon, ChannelIcon, LockIcon, GiftIcon,
+} from '@/components/Icons';
+import { GiftsModal, GiftType, GIFTS } from '@/components/GiftsModal';
 
-export default function CallsView() {
+interface Props {
+  chatId: string | null;
+  peer: Profile;
+  group: Group | null;
+  onBack: () => void;
+  onCall: (peer: Profile, callType: 'audio' | 'video') => void;
+}
+
+const EMOJIS = ['❤️', '👍', '😂', '🔥', '😮', '😢', '🎉', '👏'];
+const springTransition = { type: 'spring' as const, stiffness: 300, damping: 30 };
+
+export default function ChatView({ chatId, peer, group, onBack, onCall }: Props) {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const [calls, setCalls] = useState<(Call & { peer: Profile | null; isOutgoing: boolean })[]>([]);
+  const isSelfChat = user ? peer.id === user.id : false;
+  const isGroupChat = group !== null;
+  const isChannel = group?.type === 'channel';
+  const isChannelOwner = isChannel && user ? group.owner_id === user.id : false;
+  const canPostInChannel = !isChannel || isChannelOwner;
+
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [reactions, setReactions] = useState<Record<string, Reaction[]>>({});
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
+  const [disappearing, setDisappearing] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [mediaPreview, setMediaPreview] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showGifts, setShowGifts] = useState(false);
+  const [senderProfiles, setSenderProfiles] = useState<Record<string, Profile>>({});
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
-  const loadCalls = useCallback(async () => {
-    if (!user) return;
+  const decryptMessages = useCallback(async (msgs: Message[]): Promise<Message[]> => {
+    if (!user || isSelfChat || isGroupChat) return msgs;
+    return Promise.all(
+      msgs.map(async (m) => {
+        if (m.content && m.content.startsWith('enc:')) {
+          try {
+            const decrypted = await decryptMessage(m.content, user.id, peer.id);
+            return { ...m, content: decrypted };
+          } catch {
+            return { ...m, content: '🔒 [Ошибка дешифрования]' };
+          }
+        }
+        return m;
+      })
+    );
+  }, [user, peer.id, isSelfChat, isGroupChat]);
 
-    const { data } = await supabase
-      .from('calls')
-      .select('*')
-      .or(`caller_id.eq.${user.id},receiver_id.eq.${user.id}`)
-      .order('created_at', { ascending: false })
-      .limit(50);
+  const loadMessages = useCallback(async () => {
+    if (isGroupChat && group) {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('group_id', group.id)
+        .order('created_at', { ascending: true });
 
-    if (!data) {
-      setLoading(false);
-      return;
+      if (error) { setLoading(false); return; }
+
+      if (data) {
+        const filtered = data.filter((m) => {
+          if (m.disappearing && m.expires_at) return new Date(m.expires_at) > new Date();
+          return true;
+        });
+        setMessages(filtered as Message[]);
+
+        const senderIds = [...new Set(filtered.map((m) => m.sender_id))];
+        if (senderIds.length > 0) {
+          const { data: profilesData } = await supabase.from('profiles').select('*').in('id', senderIds);
+          if (profilesData) {
+            const map: Record<string, Profile> = {};
+            for (const p of profilesData) map[p.id] = p as Profile;
+            setSenderProfiles(map);
+          }
+        }
+      }
+    } else if (chatId) {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('chat_id', chatId)
+        .order('created_at', { ascending: true });
+
+      if (error) { setLoading(false); return; }
+
+      if (data) {
+        const now = new Date();
+        const filtered = data.filter((m) => {
+          if (m.disappearing && m.expires_at) return new Date(m.expires_at) > now;
+          return true;
+        });
+        const decrypted = await decryptMessages(filtered as Message[]);
+        setMessages(decrypted);
+      }
     }
-
-    const peerIds = [...new Set(
-      data.map((c) => (c.caller_id === user.id ? c.receiver_id : c.caller_id))
-    )];
-
-    const { data: profiles } = await supabase.from('profiles').select('*').in('id', peerIds);
-
-    const cache: Record<string, Profile> = {};
-    if (profiles) {
-      for (const p of profiles) cache[p.id] = p as Profile;
-    }
-
-    const enriched = data.map((c) => ({
-      ...c,
-      peer: cache[c.caller_id === user.id ? c.receiver_id : c.caller_id] ?? null,
-      isOutgoing: c.caller_id === user.id,
-    }));
-
-    setCalls(enriched);
     setLoading(false);
-  }, [user]);
+  }, [chatId, group, isGroupChat, decryptMessages]);
 
   useEffect(() => {
-    loadCalls();
+    loadMessages();
+
     const channel = supabase
-      .channel('calls_list_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, () => loadCalls())
+      .channel(chatId ? `chat:${chatId}` : `group:${group?.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
+        const newMsg = payload.new as Message;
+        if (chatId && newMsg.chat_id !== chatId) return;
+        if (group && newMsg.group_id !== group.id) return;
+
+        if (newMsg.content && newMsg.content.startsWith('enc:') && !isGroupChat) {
+          const decrypted = await decryptMessages([newMsg]);
+          setMessages((prev) => prev.some(m => m.id === decrypted[0].id) ? prev : [...prev, decrypted[0]]);
+        } else {
+          setMessages((prev) => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
+        }
+      })
       .subscribe();
+
     return () => { supabase.removeChannel(channel); };
-  }, [loadCalls]);
+  }, [chatId, group, isGroupChat, decryptMessages]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const sendMessage = async (e?: FormEvent) => {
+    e?.preventDefault();
+    if (!input.trim() || !user || !canPostInChannel) return;
+
+    const plaintext = input.trim();
+    setInput('');
+    setSendError(null);
+
+    let contentToSend = plaintext;
+    if (!isSelfChat && !isGroupChat) {
+      try { contentToSend = await encryptMessage(plaintext, user.id, peer.id); } catch {}
+    }
+
+    const expiresAt = disappearing ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
+    const insertData: Record<string, unknown> = { sender_id: user.id, content: contentToSend, disappearing, expires_at: expiresAt };
+
+    if (isGroupChat && group) insertData.group_id = group.id;
+    else if (chatId) insertData.chat_id = chatId;
+
+    const { data, error } = await supabase.from('messages').insert(insertData).select('*').maybeSingle();
+
+    if (error) { setSendError(error.message); setInput(plaintext); return; }
+    if (data) {
+      const localMsg = { ...data as Message, content: plaintext };
+      setMessages((prev) => prev.some(m => m.id === localMsg.id) ? prev : [...prev, localMsg]);
+    }
+  };
+
+  const sendMedia = async (file: File, type: 'image' | 'video' | 'audio'): Promise<boolean> => {
+    if (!user || !canPostInChannel) return false;
+    const targetId = isGroupChat ? group!.id : chatId;
+    if (!targetId) return false;
+    
+    const ext = file.name.split('.').pop() || 'bin';
+    const fileName = `${targetId}/${user.id}/${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage.from('media').upload(fileName, file);
+    if (uploadError) { setSendError(uploadError.message); return false; }
+
+    const { data: urlData } = supabase.storage.from('media').getPublicUrl(fileName);
+    
+    const expiresAt = disappearing ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
+    const insertData: Record<string, unknown> = {
+      sender_id: user.id,
+      media_url: urlData.publicUrl,
+      media_type: type,
+      disappearing,
+      expires_at: expiresAt,
+    };
+
+    if (isGroupChat && group) insertData.group_id = group.id;
+    else if (chatId) insertData.chat_id = chatId;
+
+    const { data, error } = await supabase.from('messages').insert(insertData).select('*').maybeSingle();
+
+    if (error) { setSendError(error.message); return false; }
+    if (data) { setMessages((prev) => prev.some(m => m.id === data.id) ? prev : [...prev, data as Message]); }
+    return true;
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+    const file = e.target.files?.[0];
+    if (file) sendMedia(file, type);
+    e.target.value = '';
+  };
+
+  const startRecording = async () => {
+    setSendError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach((track) => track.stop());
+        if (blob.size < 100) { setRecording(false); return; }
+        const file = new File([blob], `voice-${Date.now()}.webm`, { type: 'audio/webm' });
+        await sendMedia(file, 'audio');
+        setRecording(false);
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setRecording(true);
+    } catch (err) { setSendError('Нет доступа к микрофону.'); setRecording(false); }
+  };
+
+  const stopRecording = () => { if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') mediaRecorderRef.current.stop(); };
+  const formatTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const headerName = isGroupChat ? group!.name : (isSelfChat ? t('savedMessages') : (peer.display_name || 'User'));
+  const headerSub = isGroupChat ? (isChannel ? t('channelInfo') : t('groupInfo')) : (!isSelfChat ? `@${peer.username || '...'}` : '');
+  const getSenderName = (senderId: string) => senderProfiles[senderId]?.display_name || senderProfiles[senderId]?.username || 'User';
 
   return (
-    <div className="flex flex-col h-full" style={{ background: 'var(--app-bg)' }}>
-      <div className="sticky top-0 z-10 px-5 py-4 glass-nav border-b" style={{ borderColor: 'var(--app-border-glass)' }}>
-        <h2 className="text-[26px] font-bold tracking-tight" style={{ color: 'var(--app-text)' }}>{t('calls')}</h2>
+    <div className="flex flex-col h-full relative">
+      <div className="flex items-center gap-3 p-3 glass-nav border-b z-10" style={{ borderColor: 'var(--app-border-glass)' }}>
+        <button onClick={onBack} className="p-2 rounded-lg transition-all hover:bg-white/10" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /></button>
+        {isSelfChat ? (<div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}><BookmarkIcon size={18} /></div>) : isGroupChat ? (group!.avatar_url ? <img src={group!.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" /> : <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>{isChannel ? <ChannelIcon size={18} /> : <GroupIcon size={18} />}</div>) : peer.avatar_url ? (<img src={peer.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover cursor-pointer" onClick={() => setShowProfile(true)} />) : (<div className="w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm cursor-pointer" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }} onClick={() => setShowProfile(true)}>{(peer.display_name || peer.username || '?').slice(0, 2).toUpperCase()}</div>)}
+        <div className="flex-1 min-w-0" onClick={() => { if (!isSelfChat && !isGroupChat) setShowProfile(true); }} style={{ cursor: (!isSelfChat && !isGroupChat) ? 'pointer' : 'default' }}>
+          <p className="font-semibold truncate" style={{ color: 'var(--app-text)' }}>{headerName}</p>
+          <p className="text-xs flex items-center gap-1" style={{ color: 'var(--app-text-muted)' }}>{headerSub} {!isSelfChat && !isGroupChat && <ShieldIcon size={11} style={{ color: 'var(--app-success)' }} />}</p>
+        </div>
+        {!isSelfChat && !isGroupChat && (<><button onClick={() => setShowGifts(true)} className="p-2 rounded-lg transition-all hover:bg-white/10" style={{ color: 'var(--app-accent)' }}><GiftIcon size={20} /></button><button onClick={() => onCall(peer, 'audio')} className="p-2 rounded-lg transition-all hover:bg-white/10" style={{ color: 'var(--app-accent)' }}><PhoneIcon size={20} /></button></>)}
       </div>
 
-      <div className="flex-1 overflow-y-auto scroll-smooth-touch pb-28">
-        {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <div className="w-8 h-8 border-2 rounded-full animate-spin border-t-transparent" style={{ borderColor: 'var(--app-accent)' }} />
-          </div>
-        ) : calls.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 opacity-50">
-            <p className="text-sm font-medium" style={{ color: 'var(--app-text)' }}>{t('noCalls')}</p>
-          </div>
-        ) : (
-          <div className="px-2 pt-2">
-            {calls.map((call) => (
-              <CallListItem key={call.id} call={call} t={t} />
-            ))}
-          </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-2 scroll-smooth-touch">
+        {loading ? (<div className="flex items-center justify-center h-40"><div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--app-border)', borderTopColor: 'var(--app-accent)' }} /></div>) : messages.length === 0 ? (<div className="flex items-center justify-center h-64"><p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>{t('noChats')}</p></div>) : (
+          <AnimatePresence initial={false}>
+            {messages.map((msg) => {
+              const isSent = msg.sender_id === user?.id;
+              return (
+                <motion.div key={msg.id} layout initial={{ opacity: 0, y: 12, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={springTransition} className={`flex ${isSent ? 'justify-end' : 'justify-start'} group relative`}>
+                  <div className="relative max-w-[75%]">
+                    {isGroupChat && !isSent && <p className="text-xs font-semibold ml-3 mb-0.5" style={{ color: 'var(--app-accent)' }}>{getSenderName(msg.sender_id)}</p>}
+                    <div className="rounded-2xl px-4 py-2.5 cursor-pointer transition-all hover:scale-[1.02] shadow-sm" style={{ background: isSent ? 'var(--app-accent-gradient)' : 'var(--app-surface)', color: isSent ? 'var(--app-bubbleSentText)' : 'var(--app-bubbleRecvText)', backdropFilter: 'blur(10px)', border: isSent ? 'none' : '1px solid var(--app-border)' }}>
+                      {msg.media_type === 'image' && msg.media_url && (<img src={msg.media_url} alt="" className="rounded-xl max-w-full max-h-64 mb-1" onClick={(e) => { e.stopPropagation(); setMediaPreview({ url: msg.media_url!, type: 'image' }); }} />)}
+                      {msg.media_type === 'video' && msg.media_url && <video src={msg.media_url} controls className="rounded-xl max-w-full max-h-64 mb-1" />}
+                      {msg.media_type === 'audio' && msg.media_url && <AudioPlayer url={msg.media_url} isSent={isSent} />}
+                      {msg.content && <p className="break-words whitespace-pre-wrap">{msg.content}</p>}
+                      <div className="flex items-center gap-1 mt-1"><span className="text-[10px] opacity-70">{formatTime(msg.created_at)}</span>{msg.disappearing && <TimerIcon size={12} className="opacity-70" />}</div>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {mediaPreview && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-xl" style={{ background: 'rgba(0,0,0,0.8)' }} onClick={() => setMediaPreview(null)}><img src={mediaPreview.url} alt="" className="max-w-full max-h-full rounded-2xl" /></motion.div>)}
+      {sendError && <div className="mx-3 mb-1 text-xs rounded-xl p-2 border" style={{ background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)', color: '#ef4444' }}>{sendError}</div>}
+
+      <div className="p-3 glass-nav border-t" style={{ borderColor: 'var(--app-border-glass)' }}>
+        <form onSubmit={sendMessage} className="flex items-center gap-2">
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 rounded-lg transition-all hover:bg-white/10" style={{ color: 'var(--app-text-muted)' }}><ImageIcon size={20} /></button>
+          <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(e) => handleFileSelect(e, 'image')} />
+          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder={t('typeMessage')} className="flex-1 px-4 py-2.5 rounded-xl outline-none border backdrop-blur-sm" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
+          {input.trim() ? (<motion.button type="submit" whileTap={{ scale: 0.9 }} className="p-2.5 rounded-xl transition-all" style={{ background: 'var(--app-accent)', color: '#fff' }}><SendIcon size={20} /></motion.button>) : (<button type="button" onMouseDown={startRecording} onMouseUp={stopRecording} onTouchStart={(e) => { e.preventDefault(); startRecording(); }} onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }} className="p-2.5 rounded-xl transition-all" style={{ background: recording ? 'var(--app-danger)' : 'var(--app-accent)', color: '#fff' }}><MicIcon size={20} /></button>)}
+        </form>
       </div>
     </div>
   );
 }
 
-// Вынесенный компонент для производительности (никаких лагов)
-const CallListItem = memo(function CallListItem({ call, t }: { call: any, t: any }) {
-  const name = call.peer?.display_name || call.peer?.username || 'Unknown';
-  const initials = name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
-  const isMissed = call.status === 'missed' || call.status === 'declined';
-  
-  const formatTime = (iso: string) => {
-    const d = new Date(iso);
-    const now = new Date();
-    if (d.toDateString() === now.toDateString()) {
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+const AudioPlayer = memo(function AudioPlayer({ url, isSent }: { url: string; isSent: boolean }) {
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const toggle = () => {
+    if (!audioRef.current) return;
+    if (playing) audioRef.current.pause(); else audioRef.current.play();
+    setPlaying(!playing);
+  };
+
+  const onTimeUpdate = () => {
+    if (audioRef.current) { const p = (audioRef.current.currentTime / audioRef.current.duration) * 100; setProgress(p || 0); }
   };
 
   return (
-    <div className="w-full flex items-center gap-4 px-3 py-3 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-      <div className="relative flex-shrink-0">
-        <div className="w-[50px] h-[50px] rounded-full p-[2px]" style={{ background: 'var(--app-accent-gradient)' }}>
-          {call.peer?.avatar_url ? (
-            <img src={call.peer.avatar_url} alt="" className="w-full h-full rounded-full object-cover border-2" style={{ borderColor: 'var(--app-bg)' }} />
-          ) : (
-            <div className="w-full h-full rounded-full flex items-center justify-center font-semibold text-[17px] border-2" style={{ background: 'var(--app-surface)', color: 'var(--app-text)', borderColor: 'var(--app-bg)' }}>
-              {initials}
-            </div>
-          )}
-        </div>
-      </div>
-      
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-[16px] truncate" style={{ color: isMissed ? 'var(--app-danger)' : 'var(--app-text)' }}>
-          {name}
-        </p>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          {isMissed ? (
-            <PhoneOffIcon size={14} style={{ color: 'var(--app-danger)' }} />
-          ) : call.isOutgoing ? (
-            <PhoneOutgoingIcon size={14} style={{ color: 'var(--app-text-muted)' }} />
-          ) : (
-            <PhoneIncomingIcon size={14} style={{ color: 'var(--app-success)' }} />
-          )}
-          <span className="text-[14px] truncate" style={{ color: 'var(--app-text-muted)' }}>
-            {isMissed ? 'Пропущенный' : (call.isOutgoing ? 'Исходящий' : 'Входящий')}
-          </span>
-        </div>
-      </div>
-      
-      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-        {call.call_type === 'video' && <VideoIcon size={16} style={{ color: 'var(--app-text-muted)' }} />}
-        <span className="text-[12px] font-medium" style={{ color: 'var(--app-text-muted)' }}>
-          {formatTime(call.created_at)}
-        </span>
-      </div>
+    <div className="flex items-center gap-2 min-w-[140px]">
+      <button onClick={toggle} className="flex-shrink-0">{playing ? <PauseIcon size={20} /> : <PlayIcon size={20} />}</button>
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: isSent ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)' }}><div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: isSent ? 'rgba(255,255,255,0.8)' : 'var(--app-accent)' }} /></div>
+      <audio ref={audioRef} src={url} onEnded={() => { setPlaying(false); setProgress(0); }} onTimeUpdate={onTimeUpdate} />
     </div>
   );
 });
