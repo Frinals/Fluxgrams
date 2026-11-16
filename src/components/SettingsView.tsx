@@ -25,7 +25,6 @@ export default function SettingsView() {
 
   const [subPage, setSubPage] = useState<SubPage>('main');
 
-  // Profile form state
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
   const [bio, setBio] = useState(profile?.bio ?? '');
   const [username, setUsername] = useState(profile?.username ?? '');
@@ -40,7 +39,7 @@ export default function SettingsView() {
   const [privacyCalls, setPrivacyCalls] = useState<PrivacyOption>('everyone');
   const [privacySaving, setPrivacySaving] = useState(false);
   const [privacySaved, setPrivacySaved] = useState(false);
-  // Notifications state (local only)
+  
   const [notifMessages, setNotifMessages] = useState(true);
   const [notifCalls, setNotifCalls] = useState(true);
   const [notifGifts, setNotifGifts] = useState(true);
@@ -48,9 +47,9 @@ export default function SettingsView() {
   const [notifSound, setNotifSound] = useState(true);
   const [notifVibration, setNotifVibration] = useState(true);
   const [notifPreview, setNotifPreview] = useState(true);
-  // Chat size (persisted to localStorage)
+  
   const [chatSize, setChatSize] = useState<ChatSize>(() => (localStorage.getItem('fluxgram-chat-size') as ChatSize) || 'medium');
-  // Accounts state
+  
   const [savedAccounts, setSavedAccounts] = useState<{ email: string; userId: string }[]>(() => {
     try { return JSON.parse(localStorage.getItem('fluxgram-accounts') || '[]'); } catch { return []; }
   });
@@ -103,7 +102,6 @@ export default function SettingsView() {
     const ext = file.name.split('.').pop();
     const fileName = `avatars/${user.id}.${ext}`;
     try {
-      // ИСПРАВЛЕНИЕ: папка media
       await supabase.storage.from('media').upload(fileName, file, { upsert: true });
     } catch (error) {
       console.error('[Settings] Avatar upload error:', error);
@@ -118,7 +116,6 @@ export default function SettingsView() {
     if (!file || !user) return;
     const ext = file.name.split('.').pop() || 'mp3';
     const fileName = `songs/${user.id}/${Date.now()}.${ext}`;
-    // ИСПРАВЛЕНИЕ: папка media
     const { error } = await supabase.storage.from('media').upload(fileName, file);
     if (error) { console.error('[Settings] Song upload error:', error); return; }
     const { data: urlData } = supabase.storage.from('media').getPublicUrl(fileName);
@@ -138,7 +135,6 @@ export default function SettingsView() {
     };
     if (username.trim() && usernameStatus !== 'taken') updates.username = username.trim();
     
-    // ИСПРАВЛЕНИЕ: Ловим ошибку базы данных и показываем её
     const { error } = await supabase.from('profiles').update(updates).eq('id', user.id);
     
     if (error) {
@@ -282,9 +278,6 @@ export default function SettingsView() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
-      <div className="liquid-orb" style={{ background: 'var(--app-accent)', width: 300, height: 300, top: '5%', right: '-10%' }} />
-      <div className="liquid-orb" style={{ background: 'var(--app-glow)', width: 250, height: 250, bottom: '20%', left: '-8%', animationDelay: '2s' }} />
-
       <AnimatePresence mode="wait">
         {/* ─── MAIN PAGE ─── */}
         {subPage === 'main' && (
@@ -366,7 +359,6 @@ export default function SettingsView() {
                     <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={2} className="w-full px-4 py-2.5 rounded-xl outline-none border backdrop-blur-sm resize-none" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
                   </div>
 
-                  {/* Profile Song */}
                   <div>
                     <label className="block text-sm mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('profileSong')}</label>
                     <div className="flex items-center gap-3">
@@ -378,7 +370,6 @@ export default function SettingsView() {
                         <button type="button" onClick={() => setSongUrl('')} className="text-xs px-2 py-1 rounded-lg" style={{ color: 'var(--app-danger)' }}>{t('delete')}</button>
                       )}
                     </div>
-                    {/* Красивый плеер вместо стандартного */}
                     {songUrl && <CustomAudioPlayer url={songUrl} />}
                   </div>
 
@@ -534,7 +525,6 @@ export default function SettingsView() {
   );
 }
 
-// Кастомный аудиоплеер (чтобы не было системной белой фигни)
 const CustomAudioPlayer = memo(function CustomAudioPlayer({ url }: { url: string }) {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
