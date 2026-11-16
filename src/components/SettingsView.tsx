@@ -103,7 +103,7 @@ export default function SettingsView() {
     const ext = file.name.split('.').pop();
     const fileName = `avatars/${user.id}.${ext}`;
     try {
-      // ИСПРАВЛЕНИЕ: Изменили 'chat-media' на 'media'
+      // ИСПРАВЛЕНИЕ: папка media
       await supabase.storage.from('media').upload(fileName, file, { upsert: true });
     } catch (error) {
       console.error('[Settings] Avatar upload error:', error);
@@ -118,7 +118,7 @@ export default function SettingsView() {
     if (!file || !user) return;
     const ext = file.name.split('.').pop() || 'mp3';
     const fileName = `songs/${user.id}/${Date.now()}.${ext}`;
-    // ИСПРАВЛЕНИЕ: Изменили 'chat-media' на 'media'
+    // ИСПРАВЛЕНИЕ: папка media
     const { error } = await supabase.storage.from('media').upload(fileName, file);
     if (error) { console.error('[Settings] Song upload error:', error); return; }
     const { data: urlData } = supabase.storage.from('media').getPublicUrl(fileName);
@@ -129,6 +129,7 @@ export default function SettingsView() {
     e.preventDefault();
     if (!user) return;
     setSaving(true);
+    
     const updates: Partial<Profile> = {
       display_name: displayName.trim() || null,
       bio: bio.trim() || null,
@@ -136,7 +137,16 @@ export default function SettingsView() {
       profile_song_url: songUrl || null,
     };
     if (username.trim() && usernameStatus !== 'taken') updates.username = username.trim();
-    await supabase.from('profiles').update(updates).eq('id', user.id);
+    
+    // ИСПРАВЛЕНИЕ: Ловим ошибку базы данных и показываем её
+    const { error } = await supabase.from('profiles').update(updates).eq('id', user.id);
+    
+    if (error) {
+      alert("ОШИБКА БАЗЫ ДАННЫХ: " + error.message);
+      setSaving(false);
+      return;
+    }
+
     await refreshProfile();
     setSaving(false);
     setSaved(true);
@@ -368,7 +378,7 @@ export default function SettingsView() {
                         <button type="button" onClick={() => setSongUrl('')} className="text-xs px-2 py-1 rounded-lg" style={{ color: 'var(--app-danger)' }}>{t('delete')}</button>
                       )}
                     </div>
-                    {/* ИСПРАВЛЕНИЕ: Кастомный плеер вместо стандартного <audio> */}
+                    {/* Красивый плеер вместо стандартного */}
                     {songUrl && <CustomAudioPlayer url={songUrl} />}
                   </div>
 
@@ -524,7 +534,7 @@ export default function SettingsView() {
   );
 }
 
-// НОВЫЙ КОМПОНЕНТ: Кастомный плеер в стиле жидкого стекла
+// Кастомный аудиоплеер (чтобы не было системной белой фигни)
 const CustomAudioPlayer = memo(function CustomAudioPlayer({ url }: { url: string }) {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
