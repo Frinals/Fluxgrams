@@ -140,7 +140,6 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
         
         if (lastMsg) {
           if (lastMsg.content) {
-            // ФИКС: Если текст зашифрован, показываем замочек вместо enc:
             lastMessage = lastMsg.content.startsWith('enc:') ? '🔒 Зашифровано' : lastMsg.content;
           } else if (lastMsg.media_type === 'image') lastMessage = `[${t('photo')}]`;
           else if (lastMsg.media_type === 'video') lastMessage = `[${t('video')}]`;
@@ -204,7 +203,6 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
           let lastMessage: string | null = null;
           if (lastMsg) {
             if (lastMsg.content) {
-              // ФИКС: Для групп тоже показываем замочек
               lastMessage = lastMsg.content.startsWith('enc:') ? '🔒 Зашифровано' : lastMsg.content;
             }
             else if (lastMsg.media_type === 'image') lastMessage = `[${t('photo')}]`;
@@ -292,44 +290,48 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
     });
   }, [chats, groups]);
 
-  const springTransition = { type: 'spring' as const, stiffness: 300, damping: 30 };
+  const springTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
   return (
-    <div className="flex flex-col h-full relative">
-      <div className="liquid-orb" style={{ background: 'var(--app-accent)', width: 250, height: 250, top: '10%', right: '-10%' }} />
-      <div className="liquid-orb" style={{ background: 'var(--app-glow)', width: 200, height: 200, bottom: '30%', left: '-8%', animationDelay: '3s' }} />
+    <div className="flex flex-col h-full relative" style={{ background: '#0a0a0c' }}>
+      <div className="liquid-orb" style={{ background: 'var(--app-accent)', width: 300, height: 300, top: '-5%', right: '-15%', opacity: 0.3 }} />
+      <div className="liquid-orb" style={{ background: 'var(--app-glow)', width: 250, height: 250, bottom: '10%', left: '-12%', animationDelay: '3s', opacity: 0.2 }} />
 
-      <div className="sticky top-0 z-10 p-4 glass-nav border-b" style={{ borderColor: 'var(--app-border-glass)' }}>
-        <h2 className="text-xl font-bold" style={{ color: 'var(--app-text)' }}>{t('chats')}</h2>
+      <div className="sticky top-0 z-10 px-4 py-5 backdrop-blur-xl border-b" style={{ borderColor: 'rgba(255,255,255,0.05)', background: 'rgba(10,10,12,0.7)' }}>
+        <h2 className="text-2xl font-bold tracking-tight" style={{ color: '#fff' }}>{t('chats')}</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto scroll-smooth-touch">
+      <div className="flex-1 overflow-y-auto scroll-smooth-touch pb-24">
         <StoriesBar />
 
         {loading ? (
           <div className="flex items-center justify-center h-40">
-            <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--app-border)', borderTopColor: 'var(--app-accent)' }} />
+            <div className="w-8 h-8 border-2 rounded-full animate-spin border-t-transparent" style={{ borderColor: 'var(--app-accent)' }} />
           </div>
         ) : (
-          <>
+          <div className="px-2 pt-2 space-y-0.5">
             {savedMessagesChatId && (
-              <button onClick={openSavedMessages} className="w-full flex items-center gap-3 p-3 transition-all hover:bg-white/5 border-b" style={{ borderColor: 'var(--app-border)' }}>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>
-                  <BookmarkIcon size={22} />
+              <motion.button 
+                whileTap={{ scale: 0.97 }}
+                onClick={openSavedMessages} 
+                className="w-full flex items-center gap-4 p-3 rounded-2xl transition-all hover:bg-white/5"
+              >
+                <div className="w-[54px] h-[54px] rounded-full flex items-center justify-center flex-shrink-0 shadow-lg" style={{ background: 'linear-gradient(135deg, var(--app-accent), #9b59b6)', color: '#fff' }}>
+                  <BookmarkIcon size={24} />
                 </div>
                 <div className="flex-1 text-left min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold truncate" style={{ color: 'var(--app-text)' }}>{t('savedMessages')}</p>
-                    <span className="text-xs flex-shrink-0 ml-2" style={{ color: 'var(--app-text-muted)' }}>{formatTime(savedLastTime)}</span>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <p className="font-semibold text-[15px]" style={{ color: '#fff' }}>{t('savedMessages')}</p>
+                    <span className="text-xs font-medium" style={{ color: 'var(--app-text-muted)' }}>{formatTime(savedLastTime)}</span>
                   </div>
-                  <p className="text-sm truncate" style={{ color: 'var(--app-text-muted)' }}>{savedLastMessage || '...'}</p>
+                  <p className="text-[14px] truncate" style={{ color: 'var(--app-text-muted)' }}>{savedLastMessage || '...'}</p>
                 </div>
-              </button>
+              </motion.button>
             )}
 
             {allItems.length === 0 && !savedMessagesChatId ? (
-              <div className="flex flex-col items-center justify-center h-64 p-8 text-center">
-                <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>{t('noChats')}</p>
+              <div className="flex flex-col items-center justify-center h-64 p-8 text-center opacity-50">
+                <p className="text-base font-medium" style={{ color: '#fff' }}>{t('noChats')}</p>
               </div>
             ) : (
               <AnimatePresence initial={false}>
@@ -337,20 +339,34 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
                   if ('group' in item) {
                     const g = item.group;
                     return (
-                      <motion.button key={`g-${g.id}`} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={springTransition} onClick={() => onOpenGroup(g)} className="w-full flex items-center gap-3 p-3 transition-all hover:bg-white/5 border-b" style={{ borderColor: 'var(--app-border)' }}>
+                      <motion.button 
+                        key={`g-${g.id}`} 
+                        layout 
+                        initial={{ opacity: 0, y: 10 }} 
+                        animate={{ opacity: 1, y: 0 }} 
+                        exit={{ opacity: 0 }} 
+                        whileTap={{ scale: 0.97 }}
+                        transition={springTransition} 
+                        onClick={() => onOpenGroup(g)} 
+                        className="w-full flex items-center gap-4 p-3 rounded-2xl transition-all hover:bg-white/5"
+                      >
                         <GroupAvatar group={g} />
                         <div className="flex-1 text-left min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className="font-semibold truncate flex items-center gap-1.5" style={{ color: 'var(--app-text)' }}>
-                              {g.type === 'channel' ? <ChannelIcon size={15} style={{ color: 'var(--app-accent)', flexShrink: 0 }} /> : <GroupIcon size={15} style={{ color: 'var(--app-accent)', flexShrink: 0 }} />}
+                          <div className="flex items-center justify-between mb-0.5">
+                            <p className="font-semibold text-[15px] truncate flex items-center gap-1.5" style={{ color: '#fff' }}>
+                              {g.type === 'channel' ? <ChannelIcon size={16} style={{ color: 'var(--app-accent)', flexShrink: 0 }} /> : <GroupIcon size={16} style={{ color: 'var(--app-accent)', flexShrink: 0 }} />}
                               {g.name}
                             </p>
-                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                              {item.unread_count > 0 && (<span className="min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center text-[11px] font-bold text-white" style={{ background: 'var(--app-danger)' }}>{item.unread_count > 99 ? '99+' : item.unread_count}</span>)}
-                              <span className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{formatTime(item.last_time)}</span>
+                            <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
+                              <span className="text-[11px] font-medium" style={{ color: 'var(--app-text-muted)' }}>{formatTime(item.last_time)}</span>
+                              {item.unread_count > 0 && (
+                                <span className="min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm" style={{ background: 'var(--app-accent)' }}>
+                                  {item.unread_count > 99 ? '99+' : item.unread_count}
+                                </span>
+                              )}
                             </div>
                           </div>
-                          <p className="text-sm truncate" style={{ color: 'var(--app-text-muted)' }}>{item.last_message || (g.description || '...')}</p>
+                          <p className="text-[14px] truncate" style={{ color: 'var(--app-text-muted)' }}>{item.last_message || (g.description || '...')}</p>
                         </div>
                       </motion.button>
                     );
@@ -358,40 +374,75 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
 
                   const chat = item;
                   return (
-                    <motion.button key={`c-${chat.chat_id}`} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={springTransition} onClick={() => onOpenChat(chat.chat_id, chat.peer)} className="w-full flex items-center gap-3 p-3 transition-all hover:bg-white/5 border-b" style={{ borderColor: 'var(--app-border)' }}>
+                    <motion.button 
+                      key={`c-${chat.chat_id}`} 
+                      layout 
+                      initial={{ opacity: 0, y: 10 }} 
+                      animate={{ opacity: 1, y: 0 }} 
+                      exit={{ opacity: 0 }} 
+                      whileTap={{ scale: 0.97 }}
+                      transition={springTransition} 
+                      onClick={() => onOpenChat(chat.chat_id, chat.peer)} 
+                      className="w-full flex items-center gap-4 p-3 rounded-2xl transition-all hover:bg-white/5"
+                    >
                       <Avatar profile={chat.peer} />
                       <div className="flex-1 text-left min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="font-semibold truncate" style={{ color: 'var(--app-text)' }}>{chat.peer.display_name || chat.peer.username || 'User'}</p>
-                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                            {chat.unread_count > 0 && (<span className="min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center text-[11px] font-bold text-white" style={{ background: 'var(--app-danger)' }}>{chat.unread_count > 99 ? '99+' : chat.unread_count}</span>)}
-                            <span className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{formatTime(chat.last_time)}</span>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <p className="font-semibold text-[15px] truncate" style={{ color: '#fff' }}>{chat.peer.display_name || chat.peer.username || 'User'}</p>
+                          <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
+                            <span className="text-[11px] font-medium" style={{ color: 'var(--app-text-muted)' }}>{formatTime(chat.last_time)}</span>
+                            {chat.unread_count > 0 && (
+                              <span className="min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm" style={{ background: 'var(--app-accent)' }}>
+                                {chat.unread_count > 99 ? '99+' : chat.unread_count}
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <p className="text-sm truncate" style={{ color: 'var(--app-text-muted)' }}>{chat.last_message || (chat.peer.username ? `@${chat.peer.username}` : '...')}</p>
+                        <p className="text-[14px] truncate" style={{ color: 'var(--app-text-muted)' }}>{chat.last_message || (chat.peer.username ? `@${chat.peer.username}` : '...')}</p>
                       </div>
                     </motion.button>
                   );
                 })}
               </AnimatePresence>
             )}
-          </>
+          </div>
         )}
       </div>
 
-      <div className="fixed bottom-24 right-4 z-30 pointer-events-none">
-        <motion.button whileTap={{ scale: 0.85 }} whileHover={{ scale: 1.05 }} transition={springTransition} onClick={() => setShowCreateMenu(!showCreateMenu)} className="fab w-14 h-14 rounded-full flex items-center justify-center pointer-events-auto" style={{ color: '#fff' }}>
-          <motion.div animate={{ rotate: showCreateMenu ? 45 : 0 }} transition={springTransition}><PlusIcon size={26} /></motion.div>
+      {/* Floating Action Button */}
+      <div className="fixed bottom-28 right-5 z-30 pointer-events-none">
+        <motion.button 
+          whileTap={{ scale: 0.85 }} 
+          whileHover={{ scale: 1.05 }} 
+          transition={springTransition} 
+          onClick={() => setShowCreateMenu(!showCreateMenu)} 
+          className="w-14 h-14 rounded-full flex items-center justify-center pointer-events-auto shadow-[0_8px_30px_rgba(var(--app-accent-rgb,255,100,100),0.4)]" 
+          style={{ background: 'linear-gradient(135deg, var(--app-accent), #9b59b6)', color: '#fff' }}
+        >
+          <motion.div animate={{ rotate: showCreateMenu ? 45 : 0 }} transition={springTransition}><PlusIcon size={28} /></motion.div>
         </motion.button>
       </div>
 
       <AnimatePresence>
         {showCreateMenu && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-30" onClick={() => setShowCreateMenu(false)} />
-            <motion.div initial={{ opacity: 0, y: 20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.9 }} transition={springTransition} className="fixed bottom-40 right-4 z-40 glass-panel rounded-2xl p-2 min-w-[180px]">
-              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('group'); }} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/10 transition-all"><GroupIcon size={22} style={{ color: 'var(--app-accent)' }} /><span className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>{t('newGroup')}</span></button>
-              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('channel'); }} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/10 transition-all"><ChannelIcon size={22} style={{ color: 'var(--app-accent)' }} /><span className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>{t('newChannel')}</span></button>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm" onClick={() => setShowCreateMenu(false)} />
+            <motion.div 
+              initial={{ opacity: 0, y: 20, scale: 0.9 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, y: 20, scale: 0.9 }} 
+              transition={springTransition} 
+              className="fixed bottom-44 right-5 z-40 rounded-3xl p-2 min-w-[200px] shadow-2xl border border-white/10" 
+              style={{ background: 'rgba(20, 20, 25, 0.9)', backdropFilter: 'blur(20px)' }}
+            >
+              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('group'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/10 transition-all">
+                <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center"><GroupIcon size={18} style={{ color: '#54a0ff' }} /></div>
+                <span className="font-medium text-[15px]" style={{ color: '#fff' }}>{t('newGroup')}</span>
+              </button>
+              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('channel'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/10 transition-all">
+                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center"><ChannelIcon size={18} style={{ color: '#9b59b6' }} /></div>
+                <span className="font-medium text-[15px]" style={{ color: '#fff' }}>{t('newChannel')}</span>
+              </button>
             </motion.div>
           </>
         )}
@@ -403,16 +454,18 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
 const Avatar = memo(function Avatar({ profile }: { profile: Profile }) {
   const initials = (profile.display_name || profile.username || '?').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
   const ring = ringColor(profile.id);
-  if (profile.avatar_url) {
-    return (
-      <div className="w-[52px] h-[52px] rounded-full p-[2px] flex-shrink-0" style={{ background: ring }}>
-        <img src={profile.avatar_url} alt={profile.display_name ?? ''} className="w-full h-full rounded-full object-cover border-2" style={{ borderColor: 'var(--app-bg)' }} />
-      </div>
-    );
-  }
+  
   return (
-    <div className="w-[52px] h-[52px] rounded-full p-[2px] flex-shrink-0" style={{ background: ring }}>
-      <div className="w-full h-full rounded-full flex items-center justify-center font-semibold border-2" style={{ background: 'var(--app-accent-gradient)', color: '#fff', borderColor: 'var(--app-bg)' }}>{initials}</div>
+    <div className="relative flex-shrink-0">
+      <div className="w-[54px] h-[54px] rounded-full p-[2px]" style={{ background: ring }}>
+        {profile.avatar_url ? (
+          <img src={profile.avatar_url} alt={profile.display_name ?? ''} className="w-full h-full rounded-full object-cover border-2 border-[#0a0a0c]" />
+        ) : (
+          <div className="w-full h-full rounded-full flex items-center justify-center font-semibold text-lg border-2 border-[#0a0a0c]" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>{initials}</div>
+        )}
+      </div>
+      {/* Индикатор онлайна (фейковый, для красоты) */}
+      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-[#0a0a0c]" style={{ background: '#2ecc71' }}></div>
     </div>
   );
 });
@@ -420,18 +473,16 @@ const Avatar = memo(function Avatar({ profile }: { profile: Profile }) {
 const GroupAvatar = memo(function GroupAvatar({ group }: { group: Group }) {
   const initials = group.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
   const ring = ringColor(group.id);
-  if (group.avatar_url) {
-    return (
-      <div className="w-[52px] h-[52px] rounded-full p-[2px] flex-shrink-0" style={{ background: ring }}>
-        <img src={group.avatar_url} alt={group.name} className="w-full h-full rounded-full object-cover border-2" style={{ borderColor: 'var(--app-bg)' }} />
-      </div>
-    );
-  }
+  
   return (
-    <div className="w-[52px] h-[52px] rounded-full p-[2px] flex-shrink-0" style={{ background: ring }}>
-      <div className="w-full h-full rounded-full flex items-center justify-center flex-shrink-0 border-2" style={{ background: 'var(--app-accent-gradient)', color: '#fff', borderColor: 'var(--app-bg)' }}>
-        {group.type === 'channel' ? <ChannelIcon size={22} /> : <GroupIcon size={22} />}
-      </div>
+    <div className="w-[54px] h-[54px] rounded-full p-[2px] flex-shrink-0" style={{ background: ring }}>
+      {group.avatar_url ? (
+        <img src={group.avatar_url} alt={group.name} className="w-full h-full rounded-full object-cover border-2 border-[#0a0a0c]" />
+      ) : (
+        <div className="w-full h-full rounded-full flex items-center justify-center flex-shrink-0 border-2 border-[#0a0a0c]" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>
+          {group.type === 'channel' ? <ChannelIcon size={24} /> : <GroupIcon size={24} />}
+        </div>
+      )}
     </div>
   );
 });
