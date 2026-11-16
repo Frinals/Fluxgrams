@@ -87,7 +87,6 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
   const loadChats = useCallback(async () => {
     if (!user) return;
 
-    // ФИКС: Загружаем чаты напрямую из таблицы chats, используя user1_id и user2_id
     const { data: myChats, error: chatsError } = await supabase
       .from('chats')
       .select('*')
@@ -99,7 +98,6 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
       const chatIds = myChats.map((c) => c.id);
       const peerIds = myChats.map((c) => c.user1_id === user.id ? c.user2_id : c.user1_id);
 
-      // Загружаем профили собеседников
       const { data: peerProfiles } = await supabase
         .from('profiles')
         .select('*')
@@ -110,7 +108,6 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
         for (const p of peerProfiles) peerMap.set(p.id, p as Profile);
       }
 
-      // Загружаем сообщения для этих чатов
       const { data: allMessages } = await supabase
         .from('messages')
         .select('chat_id, content, media_type, sender_id, created_at')
@@ -136,16 +133,15 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
         const peerId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id;
         const peer = peerMap.get(peerId);
         
-        // Если профиль собеседника не найден, пропускаем (чтобы не было ошибки)
         if (!peer) continue;
 
         const lastMsg = lastMsgMap.get(chat.id);
         let lastMessage: string | null = null;
         
         if (lastMsg) {
-          // Убрали проверку на enc:, теперь показывается реальный текст
           if (lastMsg.content) {
-            lastMessage = lastMsg.content;
+            // ФИКС: Если текст зашифрован, показываем замочек вместо enc:
+            lastMessage = lastMsg.content.startsWith('enc:') ? '🔒 Зашифровано' : lastMsg.content;
           } else if (lastMsg.media_type === 'image') lastMessage = `[${t('photo')}]`;
           else if (lastMsg.media_type === 'video') lastMessage = `[${t('video')}]`;
           else if (lastMsg.media_type === 'audio') lastMessage = `[${t('audio')}]`;
@@ -169,7 +165,7 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
       setChats(previews);
     }
 
-    // --- Логика загрузки групп остается без изменений ---
+    // --- Логика загрузки групп ---
     const { data: myGroups } = await supabase
       .from('group_members')
       .select('group_id')
@@ -207,7 +203,10 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
           const lastMsg = groupLastMsg.get(g.id);
           let lastMessage: string | null = null;
           if (lastMsg) {
-            if (lastMsg.content) lastMessage = lastMsg.content;
+            if (lastMsg.content) {
+              // ФИКС: Для групп тоже показываем замочек
+              lastMessage = lastMsg.content.startsWith('enc:') ? '🔒 Зашифровано' : lastMsg.content;
+            }
             else if (lastMsg.media_type === 'image') lastMessage = `[${t('photo')}]`;
             else if (lastMsg.media_type === 'video') lastMessage = `[${t('video')}]`;
             else if (lastMsg.media_type === 'audio') lastMessage = `[${t('audio')}]`;
@@ -254,11 +253,9 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
       .channel(`chat_list_updates:${user?.id ?? 'guest'}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         const record = payload.new as { chat_id?: string | null; group_id?: string | null };
-        // Обновляем список при любом новом сообщении
         loadChatsRef.current();
         if (record.chat_id === savedMessagesChatId) loadSavedRef.current();
       })
-      // ФИКС: Слушаем создание новых чатов в таблице chats
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, () => {
         loadChatsRef.current();
       })
