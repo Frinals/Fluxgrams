@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { supabase, Call, Profile } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -9,7 +9,6 @@ export default function CallsView() {
   const { t } = useLanguage();
   const [calls, setCalls] = useState<(Call & { peer: Profile | null; isOutgoing: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
-  const [peerCache, setPeerCache] = useState<Record<string, Profile>>({});
 
   const loadCalls = useCallback(async () => {
     if (!user) return;
@@ -30,17 +29,11 @@ export default function CallsView() {
       data.map((c) => (c.caller_id === user.id ? c.receiver_id : c.caller_id))
     )];
 
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('*')
-      .in('id', peerIds);
+    const { data: profiles } = await supabase.from('profiles').select('*').in('id', peerIds);
 
     const cache: Record<string, Profile> = {};
     if (profiles) {
-      for (const p of profiles) {
-        cache[p.id] = p as Profile;
-      }
-      setPeerCache(cache);
+      for (const p of profiles) cache[p.id] = p as Profile;
     }
 
     const enriched = data.map((c) => ({
@@ -56,12 +49,45 @@ export default function CallsView() {
   useEffect(() => {
     loadCalls();
     const channel = supabase
-      .channel('calls_list')
+      .channel('calls_list_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, () => loadCalls())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [loadCalls]);
 
+  return (
+    <div className="flex flex-col h-full" style={{ background: 'var(--app-bg)' }}>
+      <div className="sticky top-0 z-10 px-5 py-4 glass-nav border-b" style={{ borderColor: 'var(--app-border-glass)' }}>
+        <h2 className="text-[26px] font-bold tracking-tight" style={{ color: 'var(--app-text)' }}>{t('calls')}</h2>
+      </div>
+
+      <div className="flex-1 overflow-y-auto scroll-smooth-touch pb-28">
+        {loading ? (
+          <div className="flex items-center justify-center h-40">
+            <div className="w-8 h-8 border-2 rounded-full animate-spin border-t-transparent" style={{ borderColor: 'var(--app-accent)' }} />
+          </div>
+        ) : calls.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 opacity-50">
+            <p className="text-sm font-medium" style={{ color: 'var(--app-text)' }}>{t('noCalls')}</p>
+          </div>
+        ) : (
+          <div className="px-2 pt-2">
+            {calls.map((call) => (
+              <CallListItem key={call.id} call={call} t={t} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Вынесенный компонент для производительности (никаких лагов)
+const CallListItem = memo(function CallListItem({ call, t }: { call: any, t: any }) {
+  const name = call.peer?.display_name || call.peer?.username || 'Unknown';
+  const initials = name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
+  const isMissed = call.status === 'missed' || call.status === 'declined';
+  
   const formatTime = (iso: string) => {
     const d = new Date(iso);
     const now = new Date();
@@ -71,87 +97,44 @@ export default function CallsView() {
     return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
-  const getInitials = (name: string) =>
-    name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
-
-  const statusColor = (status: string) => {
-    if (status === 'missed') return 'var(--app-danger)';
-    if (status === 'declined') return 'var(--app-text-muted)';
-    if (status === 'accepted' || status === 'ended') return 'var(--app-success)';
-    return 'var(--app-text-muted)';
-  };
-
-  const statusLabel = (call: Call & { isOutgoing: boolean }) => {
-    if (call.status === 'missed') return t('missed');
-    if (call.status === 'declined') return t('callDeclined');
-    if (call.status === 'ended') return t('callEnded');
-    if (call.status === 'pending') return t('calling');
-    if (call.status === 'accepted') return t('callConnected');
-    return call.isOutgoing ? t('outgoing') : t('incoming');
-  };
-
   return (
-    <div className="flex flex-col h-full relative">
-      {/* Liquid background orbs */}
-      <div className="liquid-orb" style={{ background: 'var(--app-accent)', width: 250, height: 250, top: '10%', left: '-10%' }} />
-      <div className="liquid-orb" style={{ background: 'var(--app-glow)', width: 200, height: 200, bottom: '20%', right: '-8%', animationDelay: '2.5s' }} />
-
-      <div className="sticky top-0 z-10 p-4 glass-nav border-b"
-           style={{ borderColor: 'var(--app-border-glass)' }}>
-        <h2 className="text-xl font-bold" style={{ color: 'var(--app-text)' }}>{t('calls')}</h2>
+    <div className="w-full flex items-center gap-4 px-3 py-3 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+      <div className="relative flex-shrink-0">
+        <div className="w-[50px] h-[50px] rounded-full p-[2px]" style={{ background: 'var(--app-accent-gradient)' }}>
+          {call.peer?.avatar_url ? (
+            <img src={call.peer.avatar_url} alt="" className="w-full h-full rounded-full object-cover border-2" style={{ borderColor: 'var(--app-bg)' }} />
+          ) : (
+            <div className="w-full h-full rounded-full flex items-center justify-center font-semibold text-[17px] border-2" style={{ background: 'var(--app-surface)', color: 'var(--app-text)', borderColor: 'var(--app-bg)' }}>
+              {initials}
+            </div>
+          )}
+        </div>
       </div>
-
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <div className="w-8 h-8 border-2 rounded-full animate-spin"
-                 style={{ borderColor: 'var(--app-border)', borderTopColor: 'var(--app-accent)' }} />
-          </div>
-        ) : calls.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64">
-            <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>{t('noCalls')}</p>
-          </div>
-        ) : (
-          calls.map((call) => {
-            const name = call.peer?.display_name ?? 'Unknown';
-            const initials = getInitials(name);
-            return (
-              <div key={call.id}
-                   className="flex items-center gap-3 p-4 mx-3 my-1 rounded-2xl transition-all hover:scale-[1.01] glass-panel glass-shimmer">
-                {call.peer?.avatar_url ? (
-                  <img src={call.peer.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover" />
-                ) : (
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center font-semibold"
-                       style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>
-                    {initials}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold truncate" style={{ color: 'var(--app-text)' }}>{name}</p>
-                  <div className="flex items-center gap-1.5">
-                    {call.status === 'missed' || call.status === 'declined' ? (
-                      <PhoneOffIcon size={14} style={{ color: statusColor(call.status) }} />
-                    ) : call.isOutgoing ? (
-                      <PhoneOutgoingIcon size={14} style={{ color: statusColor(call.status) }} />
-                    ) : (
-                      <PhoneIncomingIcon size={14} style={{ color: statusColor(call.status) }} />
-                    )}
-                    <span className="text-sm" style={{ color: statusColor(call.status) }}>
-                      {statusLabel(call)}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  {call.call_type === 'video' && <VideoIcon size={16} style={{ color: 'var(--app-text-muted)' }} />}
-                  <span className="text-xs" style={{ color: 'var(--app-text-muted)' }}>
-                    {formatTime(call.created_at)}
-                  </span>
-                </div>
-              </div>
-            );
-          })
-        )}
+      
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-[16px] truncate" style={{ color: isMissed ? 'var(--app-danger)' : 'var(--app-text)' }}>
+          {name}
+        </p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {isMissed ? (
+            <PhoneOffIcon size={14} style={{ color: 'var(--app-danger)' }} />
+          ) : call.isOutgoing ? (
+            <PhoneOutgoingIcon size={14} style={{ color: 'var(--app-text-muted)' }} />
+          ) : (
+            <PhoneIncomingIcon size={14} style={{ color: 'var(--app-success)' }} />
+          )}
+          <span className="text-[14px] truncate" style={{ color: 'var(--app-text-muted)' }}>
+            {isMissed ? 'Пропущенный' : (call.isOutgoing ? 'Исходящий' : 'Входящий')}
+          </span>
+        </div>
+      </div>
+      
+      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+        {call.call_type === 'video' && <VideoIcon size={16} style={{ color: 'var(--app-text-muted)' }} />}
+        <span className="text-[12px] font-medium" style={{ color: 'var(--app-text-muted)' }}>
+          {formatTime(call.created_at)}
+        </span>
       </div>
     </div>
   );
-}
+});
