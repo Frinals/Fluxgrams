@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, Profile } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +8,7 @@ import { ThemeName, Language, TranslationKey, themes, themeList } from '@/lib/ty
 import {
   UserIcon, LockIcon, GlobeIcon, PaletteIcon, LogOutIcon, CheckIcon,
   ChevronRightIcon, MusicIcon, BellIcon, BackIcon, UsersIcon, AddUserIcon,
+  PlayIcon, PauseIcon
 } from '@/components/Icons';
 
 type PrivacyOption = 'everyone' | 'contacts' | 'nobody';
@@ -102,14 +103,13 @@ export default function SettingsView() {
     const ext = file.name.split('.').pop();
     const fileName = `avatars/${user.id}.${ext}`;
     try {
-      await supabase.storage.from('chat-media').upload(fileName, file, { upsert: true });
-    } catch {
-      try {
-        await supabase.storage.createBucket('chat-media', { public: true });
-        await supabase.storage.from('chat-media').upload(fileName, file, { upsert: true });
-      } catch { return; }
+      // ИСПРАВЛЕНИЕ: Изменили 'chat-media' на 'media'
+      await supabase.storage.from('media').upload(fileName, file, { upsert: true });
+    } catch (error) {
+      console.error('[Settings] Avatar upload error:', error);
+      return; 
     }
-    const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(fileName);
+    const { data: urlData } = supabase.storage.from('media').getPublicUrl(fileName);
     setAvatarUrl(urlData.publicUrl);
   };
 
@@ -118,9 +118,10 @@ export default function SettingsView() {
     if (!file || !user) return;
     const ext = file.name.split('.').pop() || 'mp3';
     const fileName = `songs/${user.id}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from('chat-media').upload(fileName, file);
+    // ИСПРАВЛЕНИЕ: Изменили 'chat-media' на 'media'
+    const { error } = await supabase.storage.from('media').upload(fileName, file);
     if (error) { console.error('[Settings] Song upload error:', error); return; }
-    const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(fileName);
+    const { data: urlData } = supabase.storage.from('media').getPublicUrl(fileName);
     setSongUrl(urlData.publicUrl);
   };
 
@@ -196,14 +197,6 @@ export default function SettingsView() {
   };
 
   const handleSwitchAccount = async (email: string) => {
-    // Find stored session for this email
-    const accounts = JSON.parse(localStorage.getItem('fluxgram-accounts') || '[]');
-    const account = accounts.find((a: { email: string }) => a.email === email);
-    if (!account) return;
-    // We rely on Supabase session persistence - just sign in again silently
-    // Since we don't store passwords, we need the user to re-authenticate
-    // But with session persistence, switching is handled by Supabase
-    // For now, we just show a message that they need to sign in
     setAddEmail(email);
     setShowAddAccount(true);
   };
@@ -260,7 +253,6 @@ export default function SettingsView() {
     </div>
   );
 
-  // Cards for main settings page — Telegram-style with 3 main items
   const cards: { key: SubPage; icon: typeof UserIcon; label: string; desc: string; iconBg: string }[] = [
     { key: 'profile', icon: UserIcon, label: t('profilePersonalization'), desc: t('profilePersonalizationDesc'), iconBg: 'var(--app-accent)' },
     { key: 'accounts', icon: UsersIcon, label: t('accounts'), desc: t('accountsDesc'), iconBg: '#e84393' },
@@ -286,46 +278,28 @@ export default function SettingsView() {
       <AnimatePresence mode="wait">
         {/* ─── MAIN PAGE ─── */}
         {subPage === 'main' && (
-          <motion.div
-            key="main"
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -30 }}
-            transition={springTransition}
-            className="flex flex-col h-full overflow-y-auto scroll-smooth-touch"
-          >
+          <motion.div key="main" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={springTransition} className="flex flex-col h-full overflow-y-auto scroll-smooth-touch">
             <div className="sticky top-0 z-10 p-4 glass-nav border-b" style={{ borderColor: 'var(--app-border-glass)' }}>
               <h2 className="text-xl font-bold" style={{ color: 'var(--app-text)' }}>{t('settings')}</h2>
             </div>
 
             <div className="p-4 space-y-3 max-w-2xl mx-auto w-full relative z-10">
-              {/* Profile card with avatar, name, @username, email */}
               <div className="glass-panel rounded-3xl p-5 flex items-center gap-4">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="" className="w-16 h-16 rounded-full object-cover" />
                 ) : (
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-xl"
-                       style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>{initials}</div>
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-xl" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>{initials}</div>
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="font-bold truncate" style={{ color: 'var(--app-text)' }}>{displayName || 'User'}</p>
                   <p className="text-sm truncate" style={{ color: 'var(--app-text-muted)' }}>@{username || '...'}</p>
-                  {userEmail && (
-                    <p className="text-xs truncate mt-0.5" style={{ color: 'var(--app-text-muted)', opacity: 0.7 }}>{userEmail}</p>
-                  )}
+                  {userEmail && <p className="text-xs truncate mt-0.5" style={{ color: 'var(--app-text-muted)', opacity: 0.7 }}>{userEmail}</p>}
                 </div>
               </div>
 
-              {/* Telegram-style clickable cards */}
               {cards.map(({ key, icon: Icon, label, desc, iconBg }) => (
-                <motion.button
-                  key={key}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setSubPage(key)}
-                  className="glass-panel rounded-2xl w-full p-4 flex items-center gap-3"
-                >
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
-                       style={{ background: iconBg }}>
+                <motion.button key={key} whileTap={{ scale: 0.98 }} onClick={() => setSubPage(key)} className="glass-panel rounded-2xl w-full p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white" style={{ background: iconBg }}>
                     <Icon size={20} style={{ color: '#fff' }} />
                   </div>
                   <div className="flex-1 text-left min-w-0">
@@ -336,10 +310,7 @@ export default function SettingsView() {
                 </motion.button>
               ))}
 
-              {/* Logout */}
-              <button onClick={() => { if (confirm(t('confirmLogout'))) signOut(); }}
-                      className="w-full py-3 rounded-2xl font-semibold transition-all hover:scale-[1.02] flex items-center justify-center gap-2 border"
-                      style={{ background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)', color: 'var(--app-danger)' }}>
+              <button onClick={() => { if (confirm(t('confirmLogout'))) signOut(); }} className="w-full py-3 rounded-2xl font-semibold transition-all hover:scale-[1.02] flex items-center justify-center gap-2 border" style={{ background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)', color: 'var(--app-danger)' }}>
                 <LogOutIcon size={20} /> {t('logout')}
               </button>
               <div className="h-4" />
@@ -349,14 +320,7 @@ export default function SettingsView() {
 
         {/* ─── PROFILE SUB-PAGE ─── */}
         {subPage === 'profile' && (
-          <motion.div
-            key="profile"
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -30 }}
-            transition={springTransition}
-            className="flex flex-col h-full overflow-y-auto scroll-smooth-touch"
-          >
+          <motion.div key="profile" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={springTransition} className="flex flex-col h-full overflow-y-auto scroll-smooth-touch">
             <SubPageHeader title={t('profilePersonalization')} />
 
             <div className="p-4 max-w-2xl mx-auto w-full relative z-10">
@@ -365,12 +329,9 @@ export default function SettingsView() {
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="" className="w-20 h-20 rounded-full object-cover" />
                   ) : (
-                    <div className="w-20 h-20 rounded-full flex items-center justify-center font-bold text-2xl"
-                         style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>{initials}</div>
+                    <div className="w-20 h-20 rounded-full flex items-center justify-center font-bold text-2xl" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>{initials}</div>
                   )}
-                  <button onClick={() => fileInputRef.current?.click()}
-                          className="px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 border"
-                          style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}>
+                  <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 border" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}>
                     {t('avatar')}
                   </button>
                   <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleAvatarUpload} />
@@ -379,60 +340,39 @@ export default function SettingsView() {
                 <form onSubmit={handleSave} className="space-y-4">
                   <div>
                     <label className="block text-sm mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('displayName')}</label>
-                    <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
-                           className="w-full px-4 py-2.5 rounded-xl outline-none border backdrop-blur-sm"
-                           style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
+                    <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full px-4 py-2.5 rounded-xl outline-none border backdrop-blur-sm" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
                   </div>
                   <div>
                     <label className="block text-sm mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('username')}</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--app-text-muted)' }}>@</span>
-                      <input type="text" value={username}
-                             onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
-                             className="w-full pl-8 pr-24 py-2.5 rounded-xl outline-none border backdrop-blur-sm"
-                             style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
-                      {usernameStatus === 'available' && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs flex items-center gap-1" style={{ color: 'var(--app-success)' }}>
-                          <CheckIcon size={14} /> {t('usernameAvailable')}
-                        </span>
-                      )}
-                      {usernameStatus === 'taken' && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: 'var(--app-danger)' }}>{t('usernameTaken')}</span>
-                      )}
+                      <input type="text" value={username} onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))} className="w-full pl-8 pr-24 py-2.5 rounded-xl outline-none border backdrop-blur-sm" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
+                      {usernameStatus === 'available' && (<span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs flex items-center gap-1" style={{ color: 'var(--app-success)' }}><CheckIcon size={14} /> {t('usernameAvailable')}</span>)}
+                      {usernameStatus === 'taken' && (<span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: 'var(--app-danger)' }}>{t('usernameTaken')}</span>)}
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('bio')}</label>
-                    <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={2}
-                              className="w-full px-4 py-2.5 rounded-xl outline-none border backdrop-blur-sm resize-none"
-                              style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
+                    <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={2} className="w-full px-4 py-2.5 rounded-xl outline-none border backdrop-blur-sm resize-none" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
                   </div>
 
                   {/* Profile Song */}
                   <div>
                     <label className="block text-sm mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{t('profileSong')}</label>
                     <div className="flex items-center gap-3">
-                      <button type="button" onClick={() => songInputRef.current?.click()}
-                              className="px-4 py-2 rounded-xl text-sm font-medium border flex items-center gap-2"
-                              style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}>
+                      <button type="button" onClick={() => songInputRef.current?.click()} className="px-4 py-2 rounded-xl text-sm font-medium border flex items-center gap-2" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}>
                         <MusicIcon size={16} /> {t('uploadSong')}
                       </button>
                       <input ref={songInputRef} type="file" accept="audio/*" hidden onChange={handleSongUpload} />
                       {songUrl && (
-                        <button type="button" onClick={() => setSongUrl('')}
-                                className="text-xs px-2 py-1 rounded-lg" style={{ color: 'var(--app-danger)' }}>
-                          {t('delete')}
-                        </button>
+                        <button type="button" onClick={() => setSongUrl('')} className="text-xs px-2 py-1 rounded-lg" style={{ color: 'var(--app-danger)' }}>{t('delete')}</button>
                       )}
                     </div>
-                    {songUrl && (
-                      <audio controls src={songUrl} className="w-full mt-2 h-10" style={{ borderRadius: '8px' }} />
-                    )}
+                    {/* ИСПРАВЛЕНИЕ: Кастомный плеер вместо стандартного <audio> */}
+                    {songUrl && <CustomAudioPlayer url={songUrl} />}
                   </div>
 
-                  <button type="submit" disabled={saving}
-                          className="w-full py-2.5 rounded-xl font-semibold transition-all hover:scale-[1.02] disabled:opacity-50"
-                          style={{ background: 'var(--app-accent)', color: '#fff' }}>
+                  <button type="submit" disabled={saving} className="w-full py-2.5 rounded-xl font-semibold transition-all hover:scale-[1.02] disabled:opacity-50" style={{ background: 'var(--app-accent)', color: '#fff' }}>
                     {saved ? <span className="flex items-center justify-center gap-2"><CheckIcon size={18} /> {t('save')}</span> : t('save')}
                   </button>
                 </form>
@@ -444,16 +384,8 @@ export default function SettingsView() {
 
         {/* ─── NOTIFICATIONS SUB-PAGE ─── */}
         {subPage === 'notifications' && (
-          <motion.div
-            key="notifications"
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -30 }}
-            transition={springTransition}
-            className="flex flex-col h-full overflow-y-auto scroll-smooth-touch"
-          >
+          <motion.div key="notifications" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={springTransition} className="flex flex-col h-full overflow-y-auto scroll-smooth-touch">
             <SubPageHeader title={t('notifications')} />
-
             <div className="p-4 max-w-2xl mx-auto w-full relative z-10 space-y-3">
               <div className="glass-panel rounded-2xl p-5 space-y-4">
                 <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--app-text-muted)' }}>{t('notificationsTitle')}</h3>
@@ -481,16 +413,8 @@ export default function SettingsView() {
 
         {/* ─── PRIVACY SUB-PAGE ─── */}
         {subPage === 'privacy' && (
-          <motion.div
-            key="privacy"
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -30 }}
-            transition={springTransition}
-            className="flex flex-col h-full overflow-y-auto scroll-smooth-touch"
-          >
+          <motion.div key="privacy" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={springTransition} className="flex flex-col h-full overflow-y-auto scroll-smooth-touch">
             <SubPageHeader title={t('privacy')} />
-
             <div className="p-4 max-w-2xl mx-auto w-full relative z-10 space-y-3">
               <div className="glass-panel rounded-2xl p-5 space-y-5">
                 {renderToggle(t('ghostMode'), t('ghostModeDesc'), ghostMode, handleGhostModeToggle)}
@@ -499,10 +423,7 @@ export default function SettingsView() {
                 <div className="h-px" style={{ background: 'var(--app-border)' }} />
                 {renderPrivacySelect(t('whoCanMessageMe'), privacyMessages, setPrivacyMessages)}
                 {renderPrivacySelect(t('whoCanCallMe'), privacyCalls, setPrivacyCalls)}
-
-                <button onClick={handlePrivacySave} disabled={privacySaving}
-                        className="w-full py-2.5 rounded-xl font-semibold transition-all disabled:opacity-50"
-                        style={{ background: 'var(--app-accent)', color: '#fff' }}>
+                <button onClick={handlePrivacySave} disabled={privacySaving} className="w-full py-2.5 rounded-xl font-semibold transition-all disabled:opacity-50" style={{ background: 'var(--app-accent)', color: '#fff' }}>
                   {privacySaved ? <span className="flex items-center justify-center gap-2"><CheckIcon size={18} /> {t('save')}</span> : t('save')}
                 </button>
               </div>
@@ -513,92 +434,41 @@ export default function SettingsView() {
 
         {/* ─── ACCOUNTS SUB-PAGE ─── */}
         {subPage === 'accounts' && (
-          <motion.div
-            key="accounts"
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -30 }}
-            transition={springTransition}
-            className="flex flex-col h-full overflow-y-auto scroll-smooth-touch"
-          >
+          <motion.div key="accounts" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={springTransition} className="flex flex-col h-full overflow-y-auto scroll-smooth-touch">
             <SubPageHeader title={t('accounts')} />
-
             <div className="p-4 max-w-2xl mx-auto w-full relative z-10 space-y-3">
-              {/* Current account */}
               <div className="glass-panel rounded-2xl p-4 flex items-center gap-3">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
-                ) : (
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold"
-                       style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>{initials}</div>
-                )}
+                {avatarUrl ? <img src={avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover" /> : <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>{initials}</div>}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold truncate" style={{ color: 'var(--app-text)' }}>{displayName || 'User'}</p>
                   <p className="text-sm truncate" style={{ color: 'var(--app-text-muted)' }}>{userEmail}</p>
                 </div>
-                <span className="text-xs px-2 py-1 rounded-lg font-medium"
-                      style={{ background: 'var(--app-surface)', color: 'var(--app-success)' }}>
-                  {t('currentAccount')}
-                </span>
+                <span className="text-xs px-2 py-1 rounded-lg font-medium" style={{ background: 'var(--app-surface)', color: 'var(--app-success)' }}>{t('currentAccount')}</span>
               </div>
 
-              {/* Other saved accounts */}
               {savedAccounts.filter((a) => a.email !== userEmail).map((account) => (
                 <div key={account.email} className="glass-panel rounded-2xl p-4 flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold"
-                       style={{ background: 'var(--app-surface)', color: 'var(--app-text-muted)' }}>
-                    {account.email[0]?.toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate" style={{ color: 'var(--app-text)' }}>{account.email}</p>
-                  </div>
-                  <button onClick={() => handleSwitchAccount(account.email)}
-                          className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
-                          style={{ background: 'var(--app-accent)', color: '#fff' }}>
-                    {t('switchAccount')}
-                  </button>
-                  <button onClick={() => handleRemoveAccount(account.email)}
-                          className="p-1.5 rounded-lg" style={{ color: 'var(--app-danger)' }}>
-                    <LogOutIcon size={16} />
-                  </button>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold" style={{ background: 'var(--app-surface)', color: 'var(--app-text-muted)' }}>{account.email[0]?.toUpperCase()}</div>
+                  <div className="flex-1 min-w-0"><p className="font-medium truncate" style={{ color: 'var(--app-text)' }}>{account.email}</p></div>
+                  <button onClick={() => handleSwitchAccount(account.email)} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all" style={{ background: 'var(--app-accent)', color: '#fff' }}>{t('switchAccount')}</button>
+                  <button onClick={() => handleRemoveAccount(account.email)} className="p-1.5 rounded-lg" style={{ color: 'var(--app-danger)' }}><LogOutIcon size={16} /></button>
                 </div>
               ))}
 
-              {/* Add account button / form */}
               {!showAddAccount ? (
-                <button onClick={() => setShowAddAccount(true)}
-                        className="w-full glass-panel rounded-2xl p-4 flex items-center gap-3 transition-all hover:scale-[1.02]">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center"
-                       style={{ background: 'var(--app-surface)' }}>
-                    <AddUserIcon size={22} style={{ color: 'var(--app-accent)' }} />
-                  </div>
+                <button onClick={() => setShowAddAccount(true)} className="w-full glass-panel rounded-2xl p-4 flex items-center gap-3 transition-all hover:scale-[1.02]">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'var(--app-surface)' }}><AddUserIcon size={22} style={{ color: 'var(--app-accent)' }} /></div>
                   <span className="font-medium" style={{ color: 'var(--app-text)' }}>{t('addAccount')}</span>
                 </button>
               ) : (
                 <div className="glass-panel rounded-2xl p-5 space-y-3">
                   <h3 className="font-semibold" style={{ color: 'var(--app-text)' }}>{t('addAccount')}</h3>
-                  <input type="email" value={addEmail} onChange={(e) => setAddEmail(e.target.value)}
-                         placeholder={t('email')}
-                         className="w-full px-4 py-2.5 rounded-xl outline-none border backdrop-blur-sm"
-                         style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
-                  <input type="password" value={addPassword} onChange={(e) => setAddPassword(e.target.value)}
-                         placeholder={t('password')}
-                         className="w-full px-4 py-2.5 rounded-xl outline-none border backdrop-blur-sm"
-                         style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
-                  {addError && (
-                    <p className="text-sm" style={{ color: 'var(--app-danger)' }}>{addError}</p>
-                  )}
+                  <input type="email" value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder={t('email')} className="w-full px-4 py-2.5 rounded-xl outline-none border backdrop-blur-sm" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
+                  <input type="password" value={addPassword} onChange={(e) => setAddPassword(e.target.value)} placeholder={t('password')} className="w-full px-4 py-2.5 rounded-xl outline-none border backdrop-blur-sm" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
+                  {addError && <p className="text-sm" style={{ color: 'var(--app-danger)' }}>{addError}</p>}
                   <div className="flex gap-2">
-                    <button onClick={() => { setShowAddAccount(false); setAddEmail(''); setAddPassword(''); setAddError(null); }}
-                            className="flex-1 py-2.5 rounded-xl font-medium border"
-                            style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}>
-                      {t('cancel')}
-                    </button>
-                    <button onClick={handleAddAccount} disabled={addingAccount}
-                            className="flex-1 py-2.5 rounded-xl font-semibold disabled:opacity-50"
-                            style={{ background: 'var(--app-accent)', color: '#fff' }}>
-                      {addingAccount ? '...' : t('addAccount')}
-                    </button>
+                    <button onClick={() => { setShowAddAccount(false); setAddEmail(''); setAddPassword(''); setAddError(null); }} className="flex-1 py-2.5 rounded-xl font-medium border" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}>{t('cancel')}</button>
+                    <button onClick={handleAddAccount} disabled={addingAccount} className="flex-1 py-2.5 rounded-xl font-semibold disabled:opacity-50" style={{ background: 'var(--app-accent)', color: '#fff' }}>{addingAccount ? '...' : t('addAccount')}</button>
                   </div>
                 </div>
               )}
@@ -609,27 +479,14 @@ export default function SettingsView() {
 
         {/* ─── APPEARANCE + LANGUAGE SUB-PAGE ─── */}
         {subPage === 'appearance' && (
-          <motion.div
-            key="appearance"
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -30 }}
-            transition={springTransition}
-            className="flex flex-col h-full overflow-y-auto scroll-smooth-touch"
-          >
+          <motion.div key="appearance" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={springTransition} className="flex flex-col h-full overflow-y-auto scroll-smooth-touch">
             <SubPageHeader title={t('appearanceAndLanguage')} />
-
             <div className="p-4 max-w-2xl mx-auto w-full relative z-10 space-y-3">
-              {/* Theme picker */}
               <div className="glass-panel rounded-2xl p-5">
-                <h3 className="flex items-center gap-2 font-semibold mb-4" style={{ color: 'var(--app-text)' }}>
-                  <PaletteIcon size={20} style={{ color: 'var(--app-accent)' }} /> {t('theme')}
-                </h3>
+                <h3 className="flex items-center gap-2 font-semibold mb-4" style={{ color: 'var(--app-text)' }}><PaletteIcon size={20} style={{ color: 'var(--app-accent)' }} /> {t('theme')}</h3>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                   {themeList.map((key) => (
-                    <button key={key} onClick={() => setTheme(key)}
-                            className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all border"
-                            style={{ background: theme === key ? 'var(--app-surface)' : 'transparent', borderColor: theme === key ? 'var(--app-accent)' : 'var(--app-border)', borderWidth: theme === key ? '2px' : '1px' }}>
+                    <button key={key} onClick={() => setTheme(key)} className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all border" style={{ background: theme === key ? 'var(--app-surface)' : 'transparent', borderColor: theme === key ? 'var(--app-accent)' : 'var(--app-border)', borderWidth: theme === key ? '2px' : '1px' }}>
                       <div className="w-10 h-10 rounded-full" style={{ background: themes[key].accentGradient }} />
                       <span className="text-sm font-medium" style={{ color: 'var(--app-text)' }}>{themeLabels[key]}</span>
                       {theme === key && <CheckIcon size={16} style={{ color: 'var(--app-accent)' }} />}
@@ -638,37 +495,22 @@ export default function SettingsView() {
                 </div>
               </div>
 
-              {/* Chat Size selector */}
               <div className="glass-panel rounded-2xl p-5">
                 <h3 className="font-semibold mb-4" style={{ color: 'var(--app-text)' }}>{t('chatSize')}</h3>
                 <p className="text-xs mb-3" style={{ color: 'var(--app-text-muted)' }}>{t('chatSizeDesc')}</p>
                 <div className="grid grid-cols-3 gap-2">
                   {chatSizeOptions.map(({ key, label }) => (
-                    <button key={key} onClick={() => handleChatSizeChange(key)}
-                            className="py-2.5 rounded-xl text-sm font-medium transition-all border"
-                            style={{
-                              background: chatSize === key ? 'var(--app-accent)' : 'var(--app-surface)',
-                              color: chatSize === key ? '#fff' : 'var(--app-text)',
-                              borderColor: chatSize === key ? 'transparent' : 'var(--app-border)',
-                            }}>
-                      {label}
-                    </button>
+                    <button key={key} onClick={() => handleChatSizeChange(key)} className="py-2.5 rounded-xl text-sm font-medium transition-all border" style={{ background: chatSize === key ? 'var(--app-accent)' : 'var(--app-surface)', color: chatSize === key ? '#fff' : 'var(--app-text)', borderColor: chatSize === key ? 'transparent' : 'var(--app-border)' }}>{label}</button>
                   ))}
                 </div>
               </div>
 
-              {/* Language picker */}
               <div className="glass-panel rounded-2xl p-5">
-                <h3 className="flex items-center gap-2 font-semibold mb-4" style={{ color: 'var(--app-text)' }}>
-                  <GlobeIcon size={20} style={{ color: 'var(--app-accent)' }} /> {t('language')}
-                </h3>
+                <h3 className="flex items-center gap-2 font-semibold mb-4" style={{ color: 'var(--app-text)' }}><GlobeIcon size={20} style={{ color: 'var(--app-accent)' }} /> {t('language')}</h3>
                 <div className="grid grid-cols-2 gap-3">
                   {langOptions.map(({ key, label }) => (
-                    <button key={key} onClick={() => setLang(key)}
-                            className="py-2.5 rounded-xl font-medium transition-all border flex items-center justify-center gap-2"
-                            style={{ background: lang === key ? 'var(--app-accent)' : 'var(--app-surface)', color: lang === key ? '#fff' : 'var(--app-text)', borderColor: 'var(--app-border)' }}>
-                      {lang === key && <CheckIcon size={16} />}
-                      {label}
+                    <button key={key} onClick={() => setLang(key)} className="py-2.5 rounded-xl font-medium transition-all border flex items-center justify-center gap-2" style={{ background: lang === key ? 'var(--app-accent)' : 'var(--app-surface)', color: lang === key ? '#fff' : 'var(--app-text)', borderColor: 'var(--app-border)' }}>
+                      {lang === key && <CheckIcon size={16} />}{label}
                     </button>
                   ))}
                 </div>
@@ -681,3 +523,36 @@ export default function SettingsView() {
     </div>
   );
 }
+
+// НОВЫЙ КОМПОНЕНТ: Кастомный плеер в стиле жидкого стекла
+const CustomAudioPlayer = memo(function CustomAudioPlayer({ url }: { url: string }) {
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const toggle = () => {
+    if (!audioRef.current) return;
+    if (playing) audioRef.current.pause();
+    else audioRef.current.play();
+    setPlaying(!playing);
+  };
+
+  const onTimeUpdate = () => {
+    if (audioRef.current) {
+      const p = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+      setProgress(p || 0);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 mt-2 p-2.5 rounded-xl border" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
+      <button onClick={toggle} className="flex-shrink-0 p-1.5 rounded-full transition-all hover:scale-105" style={{ background: 'var(--app-accent)', color: '#fff' }}>
+        {playing ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
+      </button>
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--app-border)' }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: 'var(--app-accent)' }} />
+      </div>
+      <audio ref={audioRef} src={url} onEnded={() => { setPlaying(false); setProgress(0); }} onTimeUpdate={onTimeUpdate} />
+    </div>
+  );
+});
