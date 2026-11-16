@@ -237,14 +237,34 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: Props)
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex items-center gap-3 p-3 glass-nav border-b z-10" style={{ borderColor: 'var(--app-border-glass)' }}>
+      
+      {/* ФИКС: Шапка теперь зафиксирована наверху и не пропадет */}
+      <div 
+        className="flex items-center gap-3 p-3 glass-nav border-b z-20 sticky top-0 flex-shrink-0" 
+        style={{ borderColor: 'var(--app-border-glass)', background: 'var(--app-nav-bg)' }}
+      >
         <button onClick={onBack} className="p-2 rounded-lg transition-all hover:bg-white/10" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /></button>
-        {isSelfChat ? (<div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}><BookmarkIcon size={18} /></div>) : isGroupChat ? (group!.avatar_url ? <img src={group!.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" /> : <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>{isChannel ? <ChannelIcon size={18} /> : <GroupIcon size={18} />}</div>) : peer.avatar_url ? (<img src={peer.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover cursor-pointer" onClick={() => setShowProfile(true)} />) : (<div className="w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm cursor-pointer" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }} onClick={() => setShowProfile(true)}>{(peer.display_name || peer.username || '?').slice(0, 2).toUpperCase()}</div>)}
+        {isSelfChat ? (
+          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}><BookmarkIcon size={18} /></div>
+        ) : isGroupChat ? (
+          group!.avatar_url ? <img src={group!.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" /> : <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>{isChannel ? <ChannelIcon size={18} /> : <GroupIcon size={18} />}</div>
+        ) : peer.avatar_url ? (
+          <img src={peer.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover cursor-pointer" onClick={() => setShowProfile(true)} />
+        ) : (
+          <div className="w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm cursor-pointer" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }} onClick={() => setShowProfile(true)}>
+            {(peer.display_name || peer.username || '?').slice(0, 2).toUpperCase()}
+          </div>
+        )}
         <div className="flex-1 min-w-0" onClick={() => { if (!isSelfChat && !isGroupChat) setShowProfile(true); }} style={{ cursor: (!isSelfChat && !isGroupChat) ? 'pointer' : 'default' }}>
           <p className="font-semibold truncate" style={{ color: 'var(--app-text)' }}>{headerName}</p>
           <p className="text-xs flex items-center gap-1" style={{ color: 'var(--app-text-muted)' }}>{headerSub} {!isSelfChat && !isGroupChat && <ShieldIcon size={11} style={{ color: 'var(--app-success)' }} />}</p>
         </div>
-        {!isSelfChat && !isGroupChat && (<><button onClick={() => setShowGifts(true)} className="p-2 rounded-lg transition-all hover:bg-white/10" style={{ color: 'var(--app-accent)' }}><GiftIcon size={20} /></button><button onClick={() => onCall(peer, 'audio')} className="p-2 rounded-lg transition-all hover:bg-white/10" style={{ color: 'var(--app-accent)' }}><PhoneIcon size={20} /></button></>)}
+        {!isSelfChat && !isGroupChat && (
+          <>
+            <button onClick={() => setShowGifts(true)} className="p-2 rounded-lg transition-all hover:bg-white/10" style={{ color: 'var(--app-accent)' }}><GiftIcon size={20} /></button>
+            <button onClick={() => onCall(peer, 'audio')} className="p-2 rounded-lg transition-all hover:bg-white/10" style={{ color: 'var(--app-accent)' }}><PhoneIcon size={20} /></button>
+          </>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-2 scroll-smooth-touch">
@@ -275,7 +295,7 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: Props)
       {mediaPreview && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-xl" style={{ background: 'rgba(0,0,0,0.8)' }} onClick={() => setMediaPreview(null)}><img src={mediaPreview.url} alt="" className="max-w-full max-h-full rounded-2xl" /></motion.div>)}
       {sendError && <div className="mx-3 mb-1 text-xs rounded-xl p-2 border" style={{ background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)', color: '#ef4444' }}>{sendError}</div>}
 
-      <div className="p-3 glass-nav border-t" style={{ borderColor: 'var(--app-border-glass)' }}>
+      <div className="p-3 glass-nav border-t flex-shrink-0" style={{ borderColor: 'var(--app-border-glass)' }}>
         <form onSubmit={sendMessage} className="flex items-center gap-2">
           <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 rounded-lg transition-all hover:bg-white/10" style={{ color: 'var(--app-text-muted)' }}><ImageIcon size={20} /></button>
           <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(e) => handleFileSelect(e, 'image')} />
