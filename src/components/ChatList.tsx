@@ -143,8 +143,9 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
         let lastMessage: string | null = null;
         
         if (lastMsg) {
+          // Убрали проверку на enc:, теперь показывается реальный текст
           if (lastMsg.content) {
-            lastMessage = lastMsg.content.startsWith('enc:') ? '[Encrypted]' : lastMsg.content;
+            lastMessage = lastMsg.content;
           } else if (lastMsg.media_type === 'image') lastMessage = `[${t('photo')}]`;
           else if (lastMsg.media_type === 'video') lastMessage = `[${t('video')}]`;
           else if (lastMsg.media_type === 'audio') lastMessage = `[${t('audio')}]`;
