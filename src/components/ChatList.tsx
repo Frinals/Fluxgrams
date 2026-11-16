@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, Profile, Group, GroupType } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -98,11 +98,7 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
       const chatIds = myChats.map((c) => c.id);
       const peerIds = myChats.map((c) => c.user1_id === user.id ? c.user2_id : c.user1_id);
 
-      const { data: peerProfiles } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', peerIds);
-
+      const { data: peerProfiles } = await supabase.from('profiles').select('*').in('id', peerIds);
       const peerMap = new Map<string, Profile>();
       if (peerProfiles) {
         for (const p of peerProfiles) peerMap.set(p.id, p as Profile);
@@ -132,7 +128,6 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
       for (const chat of myChats) {
         const peerId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id;
         const peer = peerMap.get(peerId);
-        
         if (!peer) continue;
 
         const lastMsg = lastMsgMap.get(chat.id);
@@ -164,19 +159,12 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
       setChats(previews);
     }
 
-    // --- Логика загрузки групп ---
-    const { data: myGroups } = await supabase
-      .from('group_members')
-      .select('group_id')
-      .eq('user_id', user.id);
+    // --- Загрузка групп ---
+    const { data: myGroups } = await supabase.from('group_members').select('group_id').eq('user_id', user.id);
 
     if (myGroups && myGroups.length > 0) {
       const groupIds = myGroups.map((g) => g.group_id);
-
-      const { data: groupData } = await supabase
-        .from('groups')
-        .select('*')
-        .in('id', groupIds);
+      const { data: groupData } = await supabase.from('groups').select('*').in('id', groupIds);
 
       if (groupData && groupData.length > 0) {
         const { data: groupMessages } = await supabase
@@ -187,6 +175,7 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
 
         const groupLastMsg = new Map<string, { content: string | null; media_type: string | null; created_at: string }>();
         const groupUnread = new Map<string, number>();
+        
         if (groupMessages) {
           for (const m of groupMessages) {
             if (!groupLastMsg.has(m.group_id)) {
@@ -202,9 +191,7 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
           const lastMsg = groupLastMsg.get(g.id);
           let lastMessage: string | null = null;
           if (lastMsg) {
-            if (lastMsg.content) {
-              lastMessage = lastMsg.content.startsWith('enc:') ? '🔒 Зашифровано' : lastMsg.content;
-            }
+            if (lastMsg.content) lastMessage = lastMsg.content.startsWith('enc:') ? '🔒 Зашифровано' : lastMsg.content;
             else if (lastMsg.media_type === 'image') lastMessage = `[Фото]`;
             else if (lastMsg.media_type === 'video') lastMessage = `[Видео]`;
             else if (lastMsg.media_type === 'audio') lastMessage = `[Аудио]`;
@@ -290,16 +277,14 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
     });
   }, [chats, groups]);
 
-  const springTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
-
   return (
-    <div className="flex flex-col h-full relative" style={{ background: '#000000' }}>
-      {/* Header */}
-      <div className="sticky top-0 z-20 px-5 py-4 backdrop-blur-2xl bg-black/60 border-b border-white/5">
-        <h2 className="text-[26px] font-bold tracking-tight text-white">{t('chats')}</h2>
+    <div className="flex flex-col h-full relative" style={{ background: 'var(--app-bg)' }}>
+      
+      <div className="sticky top-0 z-20 px-5 py-4 glass-nav border-b" style={{ borderColor: 'var(--app-border-glass)' }}>
+        <h2 className="text-[26px] font-bold tracking-tight" style={{ color: 'var(--app-text)' }}>{t('chats')}</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto scroll-smooth-touch pb-28">
+      <div className="flex-1 overflow-y-auto scroll-smooth-touch pb-28 will-change-scroll">
         <StoriesBar />
 
         {loading ? (
@@ -307,140 +292,94 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
             <div className="w-8 h-8 border-2 rounded-full animate-spin border-t-transparent" style={{ borderColor: 'var(--app-accent)' }} />
           </div>
         ) : (
-          <div className="px-3 pt-2">
+          <div className="px-2 pt-2">
             {savedMessagesChatId && (
-              <motion.button 
-                whileTap={{ scale: 0.98 }}
-                onClick={openSavedMessages} 
-                className="w-full flex items-center gap-4 px-2 py-3 rounded-2xl hover:bg-white/5 transition-colors"
-              >
-                <div className="w-[50px] h-[50px] rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--app-accent), #9b59b6)', color: '#fff' }}>
-                  <BookmarkIcon size={22} />
-                </div>
-                <div className="flex-1 text-left min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <p className="font-semibold text-[16px] text-white">{t('savedMessages')}</p>
-                    <span className="text-[12px] font-medium text-neutral-500">{formatTime(savedLastTime)}</span>
-                  </div>
-                  <p className="text-[14px] truncate text-neutral-400">{savedLastMessage || '...'}</p>
-                </div>
-              </motion.button>
+              <ListItem
+                id="saved"
+                avatarUrl={profile?.avatar_url || undefined}
+                fallbackIcon={<BookmarkIcon size={22} />}
+                name={t('savedMessages')}
+                message={savedLastMessage || '...'}
+                time={formatTime(savedLastTime)}
+                unread={0}
+                onClick={openSavedMessages}
+                isSavedMessages
+              />
             )}
 
             {allItems.length === 0 && !savedMessagesChatId ? (
               <div className="flex flex-col items-center justify-center h-64 p-8 text-center opacity-50">
-                <p className="text-base font-medium text-white">{t('noChats')}</p>
+                <p className="text-base font-medium" style={{ color: 'var(--app-text)' }}>{t('noChats')}</p>
               </div>
             ) : (
-              <AnimatePresence initial={false}>
-                {allItems.map((item) => {
-                  if ('group' in item) {
-                    const g = item.group;
-                    return (
-                      <motion.button 
-                        key={`g-${g.id}`} 
-                        layout 
-                        initial={{ opacity: 0, y: 10 }} 
-                        animate={{ opacity: 1, y: 0 }} 
-                        exit={{ opacity: 0 }} 
-                        whileTap={{ scale: 0.98 }}
-                        transition={springTransition} 
-                        onClick={() => onOpenGroup(g)} 
-                        className="w-full flex items-center gap-4 px-2 py-3 rounded-2xl hover:bg-white/5 transition-colors"
-                      >
-                        <GroupAvatar group={g} />
-                        <div className="flex-1 text-left min-w-0">
-                          <div className="flex items-center justify-between mb-0.5">
-                            <p className="font-semibold text-[16px] truncate flex items-center gap-1.5 text-white">
-                              {g.type === 'channel' ? <ChannelIcon size={14} style={{ color: 'var(--app-accent)', flexShrink: 0 }} /> : <GroupIcon size={14} style={{ color: 'var(--app-accent)', flexShrink: 0 }} />}
-                              {g.name}
-                            </p>
-                            <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
-                              <span className="text-[12px] font-medium text-neutral-500">{formatTime(item.last_time)}</span>
-                              {item.unread_count > 0 && (
-                                <span className="min-w-[20px] h-[20px] px-1.5 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-sm" style={{ background: 'var(--app-accent)' }}>
-                                  {item.unread_count > 99 ? '99+' : item.unread_count}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <p className="text-[14px] truncate text-neutral-400">{item.last_message || (g.description || '...')}</p>
-                        </div>
-                      </motion.button>
-                    );
-                  }
-
-                  const chat = item;
+              allItems.map((item) => {
+                if ('group' in item) {
+                  const g = item.group;
                   return (
-                    <motion.button 
-                      key={`c-${chat.chat_id}`} 
-                      layout 
-                      initial={{ opacity: 0, y: 10 }} 
-                      animate={{ opacity: 1, y: 0 }} 
-                      exit={{ opacity: 0 }} 
-                      whileTap={{ scale: 0.98 }}
-                      transition={springTransition} 
-                      onClick={() => onOpenChat(chat.chat_id, chat.peer)} 
-                      className="w-full flex items-center gap-4 px-2 py-3 rounded-2xl hover:bg-white/5 transition-colors"
-                    >
-                      <Avatar profile={chat.peer} />
-                      <div className="flex-1 text-left min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <p className="font-semibold text-[16px] truncate text-white">{chat.peer.display_name || chat.peer.username || 'User'}</p>
-                          <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
-                            <span className="text-[12px] font-medium text-neutral-500">{formatTime(chat.last_time)}</span>
-                            {chat.unread_count > 0 && (
-                              <span className="min-w-[20px] h-[20px] px-1.5 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-sm" style={{ background: 'var(--app-accent)' }}>
-                                {chat.unread_count > 99 ? '99+' : chat.unread_count}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <p className="text-[14px] truncate text-neutral-400">{chat.last_message || (chat.peer.username ? `@${chat.peer.username}` : '...')}</p>
-                      </div>
-                    </motion.button>
+                    <ListItem
+                      key={`g-${g.id}`}
+                      id={g.id}
+                      avatarUrl={g.avatar_url || undefined}
+                      fallbackIcon={g.type === 'channel' ? <ChannelIcon size={22} /> : <GroupIcon size={22} />}
+                      name={g.name}
+                      message={item.last_message || g.description || '...'}
+                      time={formatTime(item.last_time)}
+                      unread={item.unread_count}
+                      onClick={() => onOpenGroup(g)}
+                    />
                   );
-                })}
-              </AnimatePresence>
+                }
+                const chat = item;
+                return (
+                  <ListItem
+                    key={`c-${chat.chat_id}`}
+                    id={chat.peer.id}
+                    avatarUrl={chat.peer.avatar_url || undefined}
+                    fallbackText={(chat.peer.display_name || chat.peer.username || '?').slice(0, 2).toUpperCase()}
+                    name={chat.peer.display_name || chat.peer.username || 'User'}
+                    message={chat.last_message || (chat.peer.username ? `@${chat.peer.username}` : '...')}
+                    time={formatTime(chat.last_time)}
+                    unread={chat.unread_count}
+                    onClick={() => onOpenChat(chat.chat_id, chat.peer)}
+                  />
+                );
+              })
             )}
           </div>
         )}
       </div>
 
-      {/* Кнопка создания (FAB) */}
+      {/* Кнопка создания */}
       <div className="fixed bottom-[100px] right-5 z-30 pointer-events-none">
         <motion.button 
           whileTap={{ scale: 0.85 }} 
-          whileHover={{ scale: 1.05 }} 
-          transition={springTransition} 
+          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
           onClick={() => setShowCreateMenu(!showCreateMenu)} 
-          className="w-[56px] h-[56px] rounded-full flex items-center justify-center pointer-events-auto shadow-[0_8px_30px_rgba(255,100,100,0.4)]" 
-          style={{ background: 'linear-gradient(135deg, #ff6b6b, #ee5a24)', color: '#fff' }}
+          className="w-[56px] h-[56px] rounded-full flex items-center justify-center pointer-events-auto shadow-lg" 
+          style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}
         >
-          <motion.div animate={{ rotate: showCreateMenu ? 45 : 0 }} transition={springTransition}><PlusIcon size={28} /></motion.div>
+          <motion.div animate={{ rotate: showCreateMenu ? 45 : 0 }}><PlusIcon size={28} /></motion.div>
         </motion.button>
       </div>
 
-      {/* Меню создания */}
       <AnimatePresence>
         {showCreateMenu && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm" onClick={() => setShowCreateMenu(false)} />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm" onClick={() => setShowCreateMenu(false)} />
             <motion.div 
               initial={{ opacity: 0, y: 20, scale: 0.9 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, y: 20, scale: 0.9 }} 
-              transition={springTransition} 
-              className="fixed bottom-[170px] right-5 z-40 rounded-3xl p-2 min-w-[200px] shadow-2xl border border-white/10" 
-              style={{ background: 'rgba(20, 20, 20, 0.95)', backdropFilter: 'blur(20px)' }}
+              className="fixed bottom-[170px] right-5 z-40 rounded-3xl p-2 min-w-[200px] shadow-2xl border glass-panel" 
+              style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
             >
-              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('group'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/10 transition-all">
-                <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center"><GroupIcon size={18} style={{ color: '#54a0ff' }} /></div>
-                <span className="font-medium text-[15px] text-white">{t('newGroup')}</span>
+              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('group'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 transition-all">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-blue-500/10"><GroupIcon size={18} style={{ color: '#54a0ff' }} /></div>
+                <span className="font-medium text-[15px]" style={{ color: 'var(--app-text)' }}>{t('newGroup')}</span>
               </button>
-              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('channel'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/10 transition-all">
-                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center"><ChannelIcon size={18} style={{ color: '#9b59b6' }} /></div>
-                <span className="font-medium text-[15px] text-white">{t('newChannel')}</span>
+              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('channel'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 transition-all">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-500/10"><ChannelIcon size={18} style={{ color: '#9b59b6' }} /></div>
+                <span className="font-medium text-[15px]" style={{ color: 'var(--app-text)' }}>{t('newChannel')}</span>
               </button>
             </motion.div>
           </>
@@ -450,38 +389,48 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
   );
 }
 
-const Avatar = memo(function Avatar({ profile }: { profile: Profile }) {
-  const initials = (profile.display_name || profile.username || '?').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
-  const ring = ringColor(profile.id);
-  
-  return (
-    <div className="relative flex-shrink-0">
-      <div className="w-[50px] h-[50px] rounded-full p-[1.5px]" style={{ background: ring }}>
-        {profile.avatar_url ? (
-          <img src={profile.avatar_url} alt={profile.display_name ?? ''} className="w-full h-full rounded-full object-cover" />
-        ) : (
-          <div className="w-full h-full rounded-full flex items-center justify-center font-semibold text-[17px]" style={{ background: '#1a1a1a', color: '#fff' }}>{initials}</div>
-        )}
-      </div>
-      {/* Точка онлайна */}
-      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-[2.5px] border-black" style={{ background: '#2ecc71' }}></div>
-    </div>
-  );
-});
+// ВЫНЕСЕННЫЙ КОМПОНЕНТ (чтобы список не лагал при обновлении)
+const ListItem = memo(function ListItem({ 
+  id, avatarUrl, fallbackIcon, fallbackText, name, message, time, unread, onClick, isSavedMessages 
+}: { 
+  id: string; avatarUrl?: string; fallbackIcon?: React.ReactNode; fallbackText?: string; name: string; message: string; time: string; unread: number; onClick: () => void; isSavedMessages?: boolean;
+}) {
+  const ring = isSavedMessages ? 'linear-gradient(135deg, var(--app-accent), #9b59b6)' : ringColor(id);
 
-const GroupAvatar = memo(function GroupAvatar({ group }: { group: Group }) {
-  const initials = group.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
-  const ring = ringColor(group.id);
-  
   return (
-    <div className="w-[50px] h-[50px] rounded-full p-[1.5px] flex-shrink-0" style={{ background: ring }}>
-      {group.avatar_url ? (
-        <img src={group.avatar_url} alt={group.name} className="w-full h-full rounded-full object-cover" />
-      ) : (
-        <div className="w-full h-full rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#1a1a1a', color: '#fff' }}>
-          {group.type === 'channel' ? <ChannelIcon size={22} /> : <GroupIcon size={22} />}
+    <motion.button 
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick} 
+      className="w-full flex items-center gap-4 px-2 py-3 rounded-2xl transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+    >
+      <div className="relative flex-shrink-0">
+        <div className="w-[50px] h-[50px] rounded-full p-[2px]" style={{ background: ring }}>
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={name} className="w-full h-full rounded-full object-cover border-2" style={{ borderColor: 'var(--app-bg)' }} />
+          ) : (
+            <div className="w-full h-full rounded-full flex items-center justify-center font-semibold text-[17px] border-2" style={{ background: 'var(--app-surface)', color: 'var(--app-text)', borderColor: 'var(--app-bg)' }}>
+              {fallbackIcon || fallbackText}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+        {/* Точка онлайн */}
+        <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-[2.5px]" style={{ background: '#2ecc71', borderColor: 'var(--app-bg)' }}></div>
+      </div>
+
+      <div className="flex-1 text-left min-w-0">
+        <div className="flex items-center justify-between mb-0.5">
+          <p className="font-semibold text-[16px] truncate" style={{ color: 'var(--app-text)' }}>{name}</p>
+          <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
+            <span className="text-[12px] font-medium" style={{ color: 'var(--app-text-muted)' }}>{time}</span>
+            {unread > 0 && (
+              <span className="min-w-[20px] h-[20px] px-1.5 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-sm" style={{ background: 'var(--app-accent)' }}>
+                {unread > 99 ? '99+' : unread}
+              </span>
+            )}
+          </div>
+        </div>
+        <p className="text-[14px] truncate" style={{ color: 'var(--app-text-muted)' }}>{message}</p>
+      </div>
+    </motion.button>
   );
 });
