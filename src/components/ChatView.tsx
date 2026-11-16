@@ -178,7 +178,6 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: Props)
     const ext = file.name.split('.').pop() || 'bin';
     const fileName = `${targetId}/${user.id}/${Date.now()}.${ext}`;
 
-    // ФИКС: Изменили 'chat-media' на 'media'
     const { error: uploadError } = await supabase.storage.from('media').upload(fileName, file);
     if (uploadError) { setSendError(uploadError.message); return false; }
 
@@ -238,9 +237,6 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: Props)
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="liquid-orb" style={{ background: 'var(--app-accent)', width: 300, height: 300, top: '0%', right: '-15%' }} />
-      <div className="liquid-orb" style={{ background: 'var(--app-glow)', width: 250, height: 250, bottom: '10%', left: '-12%', animationDelay: '2s' }} />
-
       <div className="flex items-center gap-3 p-3 glass-nav border-b z-10" style={{ borderColor: 'var(--app-border-glass)' }}>
         <button onClick={onBack} className="p-2 rounded-lg transition-all hover:bg-white/10" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /></button>
         {isSelfChat ? (<div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}><BookmarkIcon size={18} /></div>) : isGroupChat ? (group!.avatar_url ? <img src={group!.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" /> : <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>{isChannel ? <ChannelIcon size={18} /> : <GroupIcon size={18} />}</div>) : peer.avatar_url ? (<img src={peer.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover cursor-pointer" onClick={() => setShowProfile(true)} />) : (<div className="w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm cursor-pointer" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }} onClick={() => setShowProfile(true)}>{(peer.display_name || peer.username || '?').slice(0, 2).toUpperCase()}</div>)}
