@@ -3,7 +3,6 @@
 @tailwind utilities;
 
 :root {
-  /* Дефолтная (Темная) тема */
   --app-bg: #0f1115;
   --app-surface: rgba(30, 34, 42, 0.8);
   --app-text: #ffffff;
@@ -18,10 +17,8 @@
   --app-bubbleRecvText: #ffffff;
   --app-nav-bg: rgba(15, 17, 21, 0.85);
   --app-glow: #ee5a24;
-  --app-bg-gradient: none;
 }
 
-/* Светлая тема */
 [data-theme="light"] {
   --app-bg: #f5f6f8;
   --app-surface: rgba(255, 255, 255, 0.9);
@@ -30,14 +27,11 @@
   --app-border: rgba(0, 0, 0, 0.1);
   --app-border-glass: rgba(0, 0, 0, 0.08);
   --app-accent: #ff6b6b;
-  --app-accent-gradient: linear-gradient(135deg, #ff6b6b, #ee5a24);
   --app-nav-bg: rgba(255, 255, 255, 0.9);
   --app-bubbleSentText: #ffffff;
   --app-bubbleRecvText: #111111;
-  --app-bg-gradient: none;
 }
 
-/* Неоновая тема */
 [data-theme="neon"] {
   --app-bg: #050510;
   --app-surface: rgba(20, 20, 40, 0.8);
@@ -47,7 +41,6 @@
   --app-accent: #ff00ff;
   --app-accent-gradient: linear-gradient(135deg, #ff00ff, #00ffff);
   --app-glow: #ff00ff;
-  --app-bg-gradient: radial-gradient(circle at top right, rgba(255,0,255,0.15), transparent 50%);
 }
 
 body {
@@ -57,10 +50,8 @@ body {
   color: var(--app-text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow: hidden;
-  transition: background-color 0.3s ease;
 }
 
-/* Оптимизированные эффекты стекла (без лагов) */
 .glass-panel {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
@@ -73,23 +64,12 @@ body {
   -webkit-backdrop-filter: blur(15px);
 }
 
-/* Убираем тяжелые лишние эффекты */
-* {
-  -webkit-tap-highlight-color: transparent;
-}
+* { -webkit-tap-highlight-color: transparent; }
+.scroll-smooth-touch { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--app-border); border-radius: 4px; }
 
-/* Плавный скролл без тормозов */
-.scroll-smooth-touch {
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-}
-
-/* Красивые скроллбары */
-::-webkit-scrollbar {
-  width: 4px;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--app-border);
-  border-radius: 4px;
+/* ВОТ ЭТА СТРОЧКА УБИВАЕТ ВСЕ КВАДРАТЫ ВО ВСЕХ ФАЙЛАХ */
+.liquid-orb {
+  display: none !important;
 }
