@@ -108,9 +108,17 @@ export default function SettingsView() {
         {/* КРАСИВЫЙ ПРОФИЛЬ (КАК НА ФОТО) */}
         {subPage === 'profile' && (
           <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col h-full overflow-y-auto pb-24">
-            {/* Шапка с кнопкой назад */}
-            <div className="absolute top-4 left-4 z-20">
-              <button onClick={() => setSubPage('main')} className="p-2 rounded-full bg-black/30 text-white backdrop-blur-md"><BackIcon size={22} /></button>
+            
+            {/* ФИКС: Шапка с кнопкой назад слева и КАРАНДАШОМ справа */}
+            <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-center">
+              <button onClick={() => setSubPage('main')} className="p-2 rounded-full bg-black/30 text-white backdrop-blur-md">
+                <BackIcon size={22} />
+              </button>
+              <button onClick={() => setSubPage('main')} className="p-2 rounded-full bg-black/30 text-white backdrop-blur-md">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                </svg>
+              </button>
             </div>
             
             {/* Баннер */}
