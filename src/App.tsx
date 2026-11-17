@@ -35,6 +35,36 @@ function MessengerApp() {
   const [chatRefreshKey, setChatRefreshKey] = useState(0);
   const triggerChatRefresh = () => setChatRefreshKey(prev => prev + 1);
 
+  // ФИКС: Уведомления и запрос доступа к ним
+  useEffect(() => {
+    // Запрашиваем разрешение на уведомления при входе
+    if ("Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+
+    if (!user) return;
+
+    // Слушаем новые сообщения для уведомлений
+    const notifChannel = supabase.channel('global_notifications')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'messages', 
+        filter: `receiver_id=eq.${user.id}` // Только те, что прислали ТЕБЕ
+      }, (payload) => {
+        // Если вкладка неактивна (свернута), показываем уведомление
+        if (document.hidden && Notification.permission === "granted") {
+          new Notification("Новое сообщение в Fluxgram!", {
+            body: payload.new.content || "Отправил файл",
+            icon: "/vite.svg" 
+          });
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(notifChannel); };
+  }, [user]);
+
   const handleCall = async (peer: Profile, callType: 'audio' | 'video') => {
     if (!user) return;
     const { data: chatId, error } = await supabase.rpc('create_chat_with_participants', { peer_id: peer.id });
@@ -74,10 +104,9 @@ function MessengerApp() {
   }
 
   return (
-    // Убрали градиенты, теперь используется цвет темы. Никаких тяжелых шаров!
     <div className="min-h-screen relative overflow-hidden" style={{ background: 'var(--app-bg)' }}>
       
-      {/* Глобальный обработчик входящих звонков (висит над всеми экранами) */}
+      {/* Глобальный обработчик входящих звонков */}
       <IncomingCallModal />
 
       {/* Модалка исходящего звонка */}
