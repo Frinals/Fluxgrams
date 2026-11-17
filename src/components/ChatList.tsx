@@ -21,19 +21,22 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
   const [savedMessagesChatId, setSavedMessagesChatId] = useState<string | null>(null);
   const [savedLastMessage, setSavedLastMessage] = useState<string | null>(null);
   const [savedLastTime, setSavedLastTime] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [showCreateMenu, setShowCreateMenu] = useState(false);
   
-  // ТЕКСТ ЗАГРУЗКИ
-  const [loadingStep, setLoadingStep] = useState(0);
+  // Статус загрузки
+  const [loading, setLoading] = useState(true);
+  const [statusText, setStatusText] = useState('Устанавливаем соединение...');
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
 
+  // Логика смены текста при загрузке
   useEffect(() => {
-    if (loading) {
-      const t1 = setTimeout(() => setLoadingStep(1), 800);
-      const t2 = setTimeout(() => setLoadingStep(2), 1600);
-      const t3 = setTimeout(() => setLoadingStep(3), 2400);
-      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    if (!loading) {
+      setStatusText('Flux');
+      return;
     }
+    setStatusText('Устанавливаем соединение...');
+    const t1 = setTimeout(() => setStatusText('Проверяем чаты...'), 800);
+    const t2 = setTimeout(() => setStatusText('Обновление...'), 1600);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [loading]);
 
   const ensureSavedMessagesChat = useCallback(async () => {
@@ -44,16 +47,15 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
 
   const loadSavedMessagesPreview = useCallback(async () => {
     if (!savedMessagesChatId) return;
-    const { data: lastMsg } = await supabase.from('messages').select('content, media_type, created_at').eq('chat_id', savedMessagesChatId).order('created_at', { ascending: false }).limit(1).maybeSingle();
-    if (lastMsg) {
-      setSavedLastMessage(lastMsg.content || `[Файл]`); setSavedLastTime(lastMsg.created_at);
-    }
+    const { data: lastMsg } = await supabase.from('messages').select('content, created_at').eq('chat_id', savedMessagesChatId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (lastMsg) { setSavedLastMessage(lastMsg.content); setSavedLastTime(lastMsg.created_at); }
   }, [savedMessagesChatId]);
 
   const loadChats = useCallback(async () => {
     if (!user) return;
-    const { data: myChats } = await supabase.from('chats').select('*').or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
+    setLoading(true);
 
+    const { data: myChats } = await supabase.from('chats').select('*').or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
     if (myChats && myChats.length > 0) {
       const chatIds = myChats.map((c) => c.id);
       const peerIds = myChats.map((c) => c.user1_id === user.id ? c.user2_id : c.user1_id);
@@ -61,15 +63,9 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
       const peerMap = new Map<string, Profile>();
       if (peerProfiles) peerProfiles.forEach(p => peerMap.set(p.id, p as Profile));
 
-      const { data: allMessages } = await supabase.from('messages').select('chat_id, content, media_type, sender_id, created_at').in('chat_id', chatIds).order('created_at', { ascending: false });
+      const { data: allMessages } = await supabase.from('messages').select('chat_id, content, sender_id, created_at').in('chat_id', chatIds).order('created_at', { ascending: false });
       const lastMsgMap = new Map<string, any>();
-      const unreadMap = new Map<string, number>();
-      if (allMessages) {
-        allMessages.forEach(m => {
-          if (!lastMsgMap.has(m.chat_id)) lastMsgMap.set(m.chat_id, m);
-          if (m.sender_id !== user.id) unreadMap.set(m.chat_id, (unreadMap.get(m.chat_id) ?? 0) + 1);
-        });
-      }
+      if (allMessages) allMessages.forEach(m => { if (!lastMsgMap.has(m.chat_id)) lastMsgMap.set(m.chat_id, m); });
 
       const previews: ChatPreview[] = [];
       myChats.forEach(chat => {
@@ -77,12 +73,8 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
         const peer = peerMap.get(peerId);
         if (!peer) return;
         const lastMsg = lastMsgMap.get(chat.id);
-        let lastMessage = null;
-        if (lastMsg) {
-          if (lastMsg.content) lastMessage = lastMsg.content.startsWith('enc:') ? '🔒 Зашифровано' : lastMsg.content;
-          else lastMessage = `[Файл]`;
-        }
-        previews.push({ chat_id: chat.id, peer, last_message: lastMessage, last_time: lastMsg?.created_at ?? null, unread_count: unreadMap.get(chat.id) ?? 0 });
+        let lastMessage = lastMsg?.content ? (lastMsg.content.startsWith('enc:') ? '🔒 Зашифровано' : lastMsg.content) : null;
+        previews.push({ chat_id: chat.id, peer, last_message: lastMessage, last_time: lastMsg?.created_at ?? null, unread_count: 0 });
       });
       previews.sort((a, b) => (!a.last_time ? 1 : !b.last_time ? -1 : new Date(b.last_time).getTime() - new Date(a.last_time).getTime()));
       setChats(previews);
@@ -91,33 +83,15 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
     const { data: myGroups } = await supabase.from('group_members').select('group_id').eq('user_id', user.id);
     if (myGroups && myGroups.length > 0) {
       const { data: groupData } = await supabase.from('groups').select('*').in('id', myGroups.map(g => g.group_id));
-      if (groupData) {
-        const groupPreviews: GroupPreview[] = groupData.map(g => ({ group: g as Group, last_message: 'Группа', last_time: g.created_at, unread_count: 0 }));
-        setGroups(groupPreviews);
-      }
+      if (groupData) setGroups(groupData.map(g => ({ group: g as Group, last_message: 'Группа', last_time: g.created_at, unread_count: 0 })));
     } else { setGroups([]); }
+    
     setLoading(false);
   }, [user]);
 
-  useEffect(() => {
-    ensureSavedMessagesChat().then(loadChats);
-  }, [ensureSavedMessagesChat, loadChats]);
-
+  useEffect(() => { ensureSavedMessagesChat().then(loadChats); }, [ensureSavedMessagesChat, loadChats]);
   useEffect(() => { loadSavedMessagesPreview(); }, [loadSavedMessagesPreview]);
 
-  const loadChatsRef = useRef(loadChats);
-  loadChatsRef.current = loadChats;
-
-  useEffect(() => {
-    const channel = supabase.channel(`chat_list_updates:${user?.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => loadChatsRef.current())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, () => loadChatsRef.current())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user?.id]);
-
-  const openSavedMessages = () => { if (savedMessagesChatId && profile) onOpenChat(savedMessagesChatId, profile); };
-  const formatTime = (iso: string | null) => !iso ? '' : new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const allItems = useMemo(() => [...chats, ...groups].sort((a, b) => {
     const aT = 'last_time' in a ? a.last_time : null; const bT = 'last_time' in b ? b.last_time : null;
     return (!aT ? 1 : !bT ? -1 : new Date(bT).getTime() - new Date(aT).getTime());
@@ -125,36 +99,28 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: Pro
 
   return (
     <div className="flex flex-col h-full relative" style={{ background: 'var(--app-bg)' }}>
-      <div className="sticky top-0 z-20 px-5 py-4 glass-nav border-b" style={{ borderColor: 'var(--app-border-glass)' }}>
+      <div className="sticky top-0 z-20 px-5 py-4 glass-nav border-b flex items-center justify-between" style={{ borderColor: 'var(--app-border-glass)' }}>
         <h2 className="text-[26px] font-bold tracking-tight" style={{ color: 'var(--app-text)' }}>{t('chats')}</h2>
+        {/* ТЕКСТ СТАТУСА СВЕРХУ */}
+        <span className="text-xs font-medium px-3 py-1 rounded-full bg-white/5 border border-white/10" style={{ color: loading ? 'var(--app-accent)' : 'var(--app-text-muted)' }}>
+          {statusText}
+        </span>
       </div>
 
-      {/* ТЕКСТОВАЯ ЗАГРУЗКА ВМЕСТО КРУЖКА */}
-      {loading ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-8">
-          <p className="text-lg font-semibold animate-pulse" style={{ color: 'var(--app-text)' }}>
-            {loadingStep === 0 && 'Устанавливаем соединение...'}
-            {loadingStep === 1 && 'Проверяем чаты...'}
-            {loadingStep === 2 && 'Обновление...'}
-            {loadingStep === 3 && 'Flux'}
-          </p>
+      <div className="flex-1 overflow-y-auto scroll-smooth-touch pb-28">
+        <StoriesBar />
+        <div className="px-2 pt-2">
+          {savedMessagesChatId && (
+            <ListItem id="saved" fallbackIcon={<BookmarkIcon size={22} />} name={t('savedMessages')} message={savedLastMessage || '...'} time="" unread={0} onClick={() => profile && onOpenChat(savedMessagesChatId, profile)} isSaved />
+          )}
+          {allItems.map((item) => {
+            if ('group' in item) {
+              return <ListItem key={`g-${item.group.id}`} id={item.group.id} fallbackIcon={<GroupIcon size={22} />} name={item.group.name} message={item.last_message || '...'} time="" unread={item.unread_count} onClick={() => onOpenGroup(item.group)} />;
+            }
+            return <ListItem key={`c-${item.chat_id}`} id={item.peer.id} avatarUrl={item.peer.avatar_url || undefined} fallbackText={(item.peer.display_name || '?').slice(0, 2).toUpperCase()} name={item.peer.display_name || 'User'} message={item.last_message || '...'} time="" unread={item.unread_count} onClick={() => onOpenChat(item.chat_id, item.peer)} />;
+          })}
         </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto scroll-smooth-touch pb-28">
-          <StoriesBar />
-          <div className="px-2 pt-2">
-            {savedMessagesChatId && (
-              <ListItem id="saved" fallbackIcon={<BookmarkIcon size={22} />} name={t('savedMessages')} message={savedLastMessage || '...'} time={formatTime(savedLastTime)} unread={0} onClick={openSavedMessages} isSaved />
-            )}
-            {allItems.map((item) => {
-              if ('group' in item) {
-                return <ListItem key={`g-${item.group.id}`} id={item.group.id} fallbackIcon={<GroupIcon size={22} />} name={item.group.name} message={item.last_message || '...'} time={formatTime(item.last_time)} unread={item.unread_count} onClick={() => onOpenGroup(item.group)} />;
-              }
-              return <ListItem key={`c-${item.chat_id}`} id={item.peer.id} avatarUrl={item.peer.avatar_url || undefined} fallbackText={(item.peer.display_name || '?').slice(0, 2).toUpperCase()} name={item.peer.display_name || 'User'} message={item.last_message || '...'} time={formatTime(item.last_time)} unread={item.unread_count} onClick={() => onOpenChat(item.chat_id, item.peer)} />;
-            })}
-          </div>
-        </div>
-      )}
+      </div>
 
       <div className="fixed bottom-[100px] right-5 z-30 pointer-events-none">
         <motion.button whileTap={{ scale: 0.85 }} onClick={() => setShowCreateMenu(!showCreateMenu)} className="w-[56px] h-[56px] rounded-full flex items-center justify-center pointer-events-auto shadow-lg" style={{ background: 'var(--app-accent-gradient)', color: '#fff' }}>
@@ -184,12 +150,10 @@ const ListItem = memo(function ListItem({ id, avatarUrl, fallbackIcon, fallbackT
         <div className="w-[50px] h-[50px] rounded-full p-[2px]" style={{ background: ring }}>
           {avatarUrl ? <img src={avatarUrl} className="w-full h-full rounded-full object-cover border-2" style={{ borderColor: 'var(--app-bg)' }} /> : <div className="w-full h-full rounded-full flex items-center justify-center font-semibold border-2" style={{ background: 'var(--app-surface)', color: 'var(--app-text)', borderColor: 'var(--app-bg)' }}>{fallbackIcon || fallbackText}</div>}
         </div>
-        <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-[2.5px]" style={{ background: '#2ecc71', borderColor: 'var(--app-bg)' }}></div>
       </div>
       <div className="flex-1 text-left min-w-0">
         <div className="flex items-center justify-between mb-0.5">
           <p className="font-semibold text-[16px] truncate" style={{ color: 'var(--app-text)' }}>{name}</p>
-          <div className="flex flex-col items-end gap-1"><span className="text-[12px]" style={{ color: 'var(--app-text-muted)' }}>{time}</span></div>
         </div>
         <p className="text-[14px] truncate" style={{ color: 'var(--app-text-muted)' }}>{message}</p>
       </div>
