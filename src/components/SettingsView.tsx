@@ -16,9 +16,11 @@ export default function SettingsView() {
   const { theme, setTheme } = useTheme();
 
   const [subPage, setSubPage] = useState<SubPage>('main');
-  const [editMode, setEditMode] = useState<'none' | 'photo' | 'banner' | 'bio'>('none');
+  // Добавили режим 'editAll' для карандаша
+  const [editMode, setEditMode] = useState<'none' | 'photo' | 'banner' | 'bio' | 'editAll'>('none');
 
   const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState(''); // Стейт для ника
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [songUrl, setSongUrl] = useState('');
@@ -32,6 +34,7 @@ export default function SettingsView() {
   useEffect(() => {
     if (profile) {
       setDisplayName(profile.display_name || '');
+      setUsername(profile.username || ''); // Подгружаем ник
       setBio(profile.bio || '');
       setAvatarUrl(profile.avatar_url || '');
       setSongUrl(profile.profile_song_url || '');
@@ -62,14 +65,28 @@ export default function SettingsView() {
     if (e) e.preventDefault();
     if (!user) return;
     setSaving(true);
+    
     const updates: any = {
-      display_name: displayName, bio, avatar_url: avatarUrl,
-      profile_song_url: songUrl, song_title: songTitle, song_artist: songArtist,
+      display_name: displayName,
+      username: username.replace(/[^a-zA-Z0-9_]/g, ''), // Очищаем ник от лишних символов
+      bio, 
+      avatar_url: avatarUrl,
+      profile_song_url: songUrl, 
+      song_title: songTitle, 
+      song_artist: songArtist,
     };
-    await supabase.from('profiles').update(updates).eq('id', user.id);
-    await refreshProfile();
+
+    const { error } = await supabase.from('profiles').update(updates).eq('id', user.id);
+    
+    if (error) {
+      // Если ник занят, покажем ошибку
+      if (error.code === '23505') alert("Этот юзернейм уже занят!");
+      else alert("Ошибка: " + error.message);
+    } else {
+      await refreshProfile();
+      setEditMode('none');
+    }
     setSaving(false);
-    setEditMode('none');
   };
 
   const cards = [
@@ -105,16 +122,17 @@ export default function SettingsView() {
           </motion.div>
         )}
 
-        {/* КРАСИВЫЙ ПРОФИЛЬ (КАК НА ФОТО) */}
+        {/* КРАСИВЫЙ ПРОФИЛЬ */}
         {subPage === 'profile' && (
           <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col h-full overflow-y-auto pb-24">
             
-            {/* ФИКС: Шапка с кнопкой назад слева и КАРАНДАШОМ справа */}
+            {/* Шапка с кнопкой назад и КАРАНДАШОМ */}
             <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-center">
               <button onClick={() => setSubPage('main')} className="p-2 rounded-full bg-black/30 text-white backdrop-blur-md">
                 <BackIcon size={22} />
               </button>
-              <button onClick={() => setSubPage('main')} className="p-2 rounded-full bg-black/30 text-white backdrop-blur-md">
+              {/* ВОТ КАРАНДАШ: теперь он открывает режим редактирования! */}
+              <button onClick={() => setEditMode('editAll')} className="p-2 rounded-full bg-black/30 text-white backdrop-blur-md">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
                 </svg>
@@ -124,7 +142,7 @@ export default function SettingsView() {
             {/* Баннер */}
             <div className="h-40 w-full relative" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}></div>
 
-            {/* Аватар поверх баннера */}
+            {/* Аватар */}
             <div className="relative -mt-16 flex flex-col items-center">
               {avatarUrl ? (
                 <img src={avatarUrl} className="w-32 h-32 rounded-full border-4 object-cover shadow-xl" style={{ borderColor: 'var(--app-bg)' }} />
@@ -134,7 +152,7 @@ export default function SettingsView() {
               <h2 className="text-2xl font-bold mt-3" style={{ color: 'var(--app-text)' }}>{displayName}</h2>
               <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>@{profile?.username}</p>
               
-              {/* Кнопки: Фото, Баннер, Био, Настройки */}
+              {/* Кнопки действий */}
               <div className="grid grid-cols-4 gap-2 mt-6 w-full px-4">
                 <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center gap-1 p-3 rounded-2xl glass-panel">
                   <ImageIcon size={20} color="var(--app-accent)" /><span className="text-[10px]" style={{ color: 'var(--app-text)' }}>Фото</span>
@@ -151,13 +169,13 @@ export default function SettingsView() {
               </div>
               <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleAvatarUpload} />
 
-              {/* О себе (Bio) */}
+              {/* О себе */}
               <div className="w-full px-4 mt-4 text-center">
                 <p className="text-sm font-semibold mb-1" style={{ color: 'var(--app-text)' }}>О себе</p>
                 <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>{bio || 'Нет описания'}</p>
               </div>
 
-              {/* МУЗЫКА (Красивый плеер с перемоткой) */}
+              {/* МУЗЫКА */}
               <div className="w-full px-4 mt-6">
                 <p className="text-sm font-semibold mb-2" style={{ color: 'var(--app-text)' }}>Музыка</p>
                 {songUrl ? (
@@ -177,20 +195,43 @@ export default function SettingsView() {
               </div>
             </div>
 
-            {/* Модалки для редактирования */}
+            {/* МОДАЛЬНОЕ ОКНО РЕДАКТИРОВАНИЯ (ОТКРЫВАЕТСЯ КАРАНДАШОМ) */}
             {editMode !== 'none' && (
               <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
                 <div className="glass-panel p-5 rounded-2xl w-full max-w-sm space-y-4">
-                  <h3 className="font-bold text-lg" style={{ color: 'var(--app-text)' }}>Редактировать {editMode === 'bio' ? 'Био' : 'Баннер'}</h3>
-                  {editMode === 'bio' && (
-                    <textarea value={bio} onChange={(e) => setBio(e.target.value)} className="w-full px-4 py-2 rounded-xl border" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
+                  <h3 className="font-bold text-lg" style={{ color: 'var(--app-text)' }}>
+                    {editMode === 'editAll' ? 'Редактировать профиль' : editMode === 'bio' ? 'Редактировать Био' : 'Баннер'}
+                  </h3>
+                  
+                  {editMode === 'editAll' && (
+                    <>
+                      <div>
+                        <label className="text-xs mb-1 block" style={{ color: 'var(--app-text-muted)' }}>Имя</label>
+                        <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full px-4 py-2 rounded-xl border" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
+                      </div>
+                      <div>
+                        <label className="text-xs mb-1 block" style={{ color: 'var(--app-text-muted)' }}>Юзернейм (@ник)</label>
+                        <input value={username} onChange={(e) => setUsername(e.target.value)} className="w-full px-4 py-2 rounded-xl border" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
+                      </div>
+                    </>
                   )}
+
+                  {(editMode === 'editAll' || editMode === 'bio') && (
+                    <div>
+                      <label className="text-xs mb-1 block" style={{ color: 'var(--app-text-muted)' }}>О себе</label>
+                      <textarea value={bio} onChange={(e) => setBio(e.target.value)} className="w-full px-4 py-2 rounded-xl border" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }} />
+                    </div>
+                  )}
+
                   {editMode === 'banner' && (
                     <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>Загрузка баннера будет в следующем обновлении.</p>
                   )}
+                  
                   <div className="flex gap-2">
                     <button onClick={() => setEditMode('none')} className="flex-1 py-2 rounded-xl border" style={{ borderColor: 'var(--app-border)', color: 'var(--app-text)' }}>Отмена</button>
-                    <button onClick={() => handleSave()} className="flex-1 py-2 rounded-xl text-white bg-blue-500">Сохранить</button>
+                    <button onClick={() => handleSave()} disabled={saving} className="flex-1 py-2 rounded-xl text-white bg-blue-500 disabled:opacity-50">
+                      {saving ? '...' : 'Сохранить'}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -198,7 +239,7 @@ export default function SettingsView() {
           </motion.div>
         )}
 
-        {/* ОСТАЛЬНЫЕ РАЗДЕЛЫ (темы и т.д.) */}
+        {/* ТЕМЫ */}
         {subPage === 'appearance' && (
           <motion.div key="appearance" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 pb-24">
             <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
@@ -218,7 +259,7 @@ export default function SettingsView() {
   );
 }
 
-// КРАСИВЫЙ ПЛЕЕР С ПЕРЕМОТКОЙ
+// КРАСИВЫЙ ПЛЕЕР
 const CustomAudioPlayer = memo(function CustomAudioPlayer({ url, title, artist, onUploadClick }: { url: string, title: string, artist: string, onUploadClick: () => void }) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -231,14 +272,8 @@ const CustomAudioPlayer = memo(function CustomAudioPlayer({ url, title, artist, 
     setPlaying(!playing);
   };
 
-  const handleTimeUpdate = () => {
-    if (audioRef.current) setCurrentTime(audioRef.current.currentTime);
-  };
-
-  const handleLoadedMetadata = () => {
-    if (audioRef.current) setDuration(audioRef.current.duration);
-  };
-
+  const handleTimeUpdate = () => { if (audioRef.current) setCurrentTime(audioRef.current.currentTime); };
+  const handleLoadedMetadata = () => { if (audioRef.current) setDuration(audioRef.current.duration); };
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (audioRef.current) {
       const time = Number(e.target.value);
@@ -258,24 +293,16 @@ const CustomAudioPlayer = memo(function CustomAudioPlayer({ url, title, artist, 
       <button onClick={toggle} className="w-12 h-12 rounded-full flex items-center justify-center text-white shrink-0" style={{ background: 'var(--app-accent-gradient)' }}>
         {playing ? <PauseIcon size={22} /> : <PlayIcon size={22} />}
       </button>
-      
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold truncate" style={{ color: 'var(--app-text)' }}>{title || 'Неизвестный трек'}</p>
         <p className="text-xs truncate mb-2" style={{ color: 'var(--app-text-muted)' }}>{artist || 'Неизвестный исполнитель'}</p>
-        
-        {/* Ползунок перемотки */}
         <div className="flex items-center gap-2">
           <span className="text-[10px]" style={{ color: 'var(--app-text-muted)' }}>{format(currentTime)}</span>
-          <input 
-            type="range" min="0" max={duration || 100} value={currentTime} onChange={handleSeek}
-            className="flex-1 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-500" 
-          />
+          <input type="range" min="0" max={duration || 100} value={currentTime} onChange={handleSeek} className="flex-1 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-500" />
           <span className="text-[10px]" style={{ color: 'var(--app-text-muted)' }}>{format(duration)}</span>
         </div>
       </div>
-
       <button onClick={onUploadClick} className="p-2 shrink-0 text-gray-400"><MusicIcon size={18} /></button>
-
       <audio ref={audioRef} src={url} onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata} onEnded={() => setPlaying(false)} />
     </div>
   );
