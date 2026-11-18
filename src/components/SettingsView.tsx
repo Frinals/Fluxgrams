@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeName, Language, TranslationKey, themes, themeList } from '@/lib/types';
-import { UserIcon, LockIcon, GlobeIcon, PaletteIcon, LogOutIcon, CheckIcon, ChevronRightIcon, MusicIcon, BellIcon, BackIcon, UsersIcon, AddUserIcon, PlayIcon, PauseIcon, ImageIcon } from '@/components/Icons';
+import { UserIcon, LockIcon, GlobeIcon, PaletteIcon, LogOutIcon, CheckIcon, ChevronRightIcon, MusicIcon, BellIcon, BackIcon, UsersIcon, AddUserIcon, PlayIcon, PauseIcon } from '@/components/Icons';
 
 type SubPage = 'main' | 'profile' | 'privacy' | 'appearance' | 'notifications' | 'accounts';
 const springTransition = { type: 'spring' as const, stiffness: 300, damping: 30 };
@@ -38,7 +38,7 @@ export default function SettingsView() {
       setUsername(profile.username || '');
       setBio(profile.bio || '');
       setAvatarUrl(profile.avatar_url || '');
-      setBannerUrl(profile.banner_url || '');
+      setBannerUrl((profile as any).banner_url || '');
       setSongUrl(profile.profile_song_url || '');
       setSongTitle(profile.song_title || '');
       setSongArtist(profile.song_artist || '');
@@ -114,7 +114,6 @@ export default function SettingsView() {
         {subPage === 'profile' && (
           <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full overflow-y-auto pb-24">
             
-            {/* Кнопки управления (Назад и Карандаш) */}
             <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-center">
               <button onClick={() => setSubPage('main')} className="p-2 rounded-full bg-black/40 text-white backdrop-blur-md"><BackIcon size={22} /></button>
               <button onClick={() => setEditMode('editAll')} className="p-2 rounded-full bg-black/40 text-white backdrop-blur-md">
@@ -122,14 +121,11 @@ export default function SettingsView() {
               </button>
             </div>
             
-            {/* Баннер */}
             <div className="h-40 w-full relative bg-gray-800" onClick={() => bannerInputRef.current?.click()}>
               {bannerUrl ? <img src={bannerUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-r from-blue-600 to-purple-600" />}
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 hover:opacity-100 transition-opacity"><ImageIcon size={24} color="#fff" /></div>
             </div>
             <input ref={bannerInputRef} type="file" accept="image/*" hidden onChange={(e) => handleUpload(e, 'banner')} />
 
-            {/* Аватар */}
             <div className="relative -mt-16 flex flex-col items-center">
               <div onClick={() => fileInputRef.current?.click()} className="relative cursor-pointer">
                 {avatarUrl ? <img src={avatarUrl} className="w-32 h-32 rounded-full border-4 object-cover" style={{ borderColor: 'var(--app-bg)' }} /> : <div className="w-32 h-32 rounded-full border-4 flex items-center justify-center text-4xl font-bold text-white" style={{ background: 'var(--app-accent)', borderColor: 'var(--app-bg)' }}>{initials}</div>}
@@ -155,7 +151,6 @@ export default function SettingsView() {
               </div>
             </div>
 
-            {/* Окно редактирования */}
             {editMode === 'editAll' && (
               <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
                 <div className="glass-panel p-5 rounded-2xl w-full max-w-sm space-y-4">
@@ -177,7 +172,6 @@ export default function SettingsView() {
           </motion.div>
         )}
 
-        {/* Заглушки для остальных вкладок, чтобы не было пустоты */}
         {subPage === 'privacy' && (
            <div className="p-4">
              <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
@@ -185,7 +179,6 @@ export default function SettingsView() {
              <div className="p-4 glass-panel rounded-2xl space-y-4">
                 <div className="flex justify-between items-center"><span style={{ color: 'var(--app-text)' }}>Кто может писать</span><span className="text-blue-500 text-sm">Все</span></div>
                 <div className="flex justify-between items-center"><span style={{ color: 'var(--app-text)' }}>Кто может звонить</span><span className="text-blue-500 text-sm">Все</span></div>
-                <div className="flex justify-between items-center"><span style={{ color: 'var(--app-text)' }}>Режим призрака</span><span className="text-gray-500 text-sm">Выкл</span></div>
              </div>
            </div>
         )}
@@ -209,7 +202,6 @@ export default function SettingsView() {
   );
 }
 
-// ПЛЕЕР
 const CustomAudioPlayer = memo(function CustomAudioPlayer({ url, title, artist, onUploadClick }: { url: string, title: string, artist: string, onUploadClick: () => void }) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
