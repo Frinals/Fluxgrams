@@ -5,14 +5,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeName, Language, TranslationKey, themes, themeList } from '@/lib/types';
-import { UserIcon, LockIcon, GlobeIcon, PaletteIcon, LogOutIcon, CheckIcon, ChevronRightIcon, MusicIcon, BellIcon, BackIcon, UsersIcon, AddUserIcon, PlayIcon, PauseIcon } from '@/components/Icons';
+import { UserIcon, LockIcon, GlobeIcon, PaletteIcon, LogOutIcon, CheckIcon, ChevronRightIcon, MusicIcon, BellIcon, BackIcon, UsersIcon, AddUserIcon, PlayIcon, PauseIcon, ImageIcon } from '@/components/Icons';
 
 type SubPage = 'main' | 'profile' | 'privacy' | 'appearance' | 'notifications' | 'accounts';
 const springTransition = { type: 'spring' as const, stiffness: 300, damping: 30 };
 
 export default function SettingsView() {
   const { user, profile, signOut, refreshProfile } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang, setLang } = useLanguage();
   const { theme, setTheme } = useTheme();
 
   const [subPage, setSubPage] = useState<SubPage>('main');
@@ -53,7 +53,7 @@ export default function SettingsView() {
     const { error } = await supabase.storage.from('media').upload(fileName, file);
     if (error) return alert("Ошибка загрузки: " + error.message);
     
-    const { data } = supabase.storage.from('media').getPublicUrl(fileName);
+    const { data } = await supabase.storage.from('media').getPublicUrl(fileName);
     if (type === 'avatar') setAvatarUrl(data.publicUrl);
     if (type === 'banner') setBannerUrl(data.publicUrl);
     if (type === 'song') setSongUrl(data.publicUrl);
@@ -65,14 +65,8 @@ export default function SettingsView() {
     setSaving(true);
     
     const updates: any = {
-      display_name: displayName,
-      username: username.replace(/[^a-zA-Z0-9_]/g, ''),
-      bio, 
-      avatar_url: avatarUrl,
-      banner_url: bannerUrl,
-      profile_song_url: songUrl, 
-      song_title: songTitle, 
-      song_artist: songArtist,
+      display_name: displayName, username: username.replace(/[^a-zA-Z0-9_]/g, ''), bio, 
+      avatar_url: avatarUrl, banner_url: bannerUrl, profile_song_url: songUrl, song_title: songTitle, song_artist: songArtist,
     };
 
     const { error } = await supabase.from('profiles').update(updates).eq('id', user.id);
@@ -82,7 +76,9 @@ export default function SettingsView() {
   };
 
   const cards = [
-    { key: 'profile', icon: UserIcon, label: 'Профиль', desc: 'Аватар, баннер, имя, био' },
+    { key: 'profile', icon: UserIcon, label: 'Профиль', desc: 'Аватар, баннер, имя, био, песня' },
+    { key: 'accounts', icon: UsersIcon, label: 'Аккаунты', desc: 'Переключение между аккаунтами' },
+    { key: 'notifications', icon: BellIcon, label: 'Уведомления', desc: 'Звуки, вибрации, превью' },
     { key: 'privacy', icon: LockIcon, label: 'Конфиденциальность', desc: 'Кто может писать и звонить' },
     { key: 'appearance', icon: PaletteIcon, label: 'Оформление', desc: 'Темы и язык' },
   ];
@@ -172,22 +168,11 @@ export default function SettingsView() {
           </motion.div>
         )}
 
-        {subPage === 'privacy' && (
-           <div className="p-4">
-             <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
-             <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--app-text)' }}>Конфиденциальность</h2>
-             <div className="p-4 glass-panel rounded-2xl space-y-4">
-                <div className="flex justify-between items-center"><span style={{ color: 'var(--app-text)' }}>Кто может писать</span><span className="text-blue-500 text-sm">Все</span></div>
-                <div className="flex justify-between items-center"><span style={{ color: 'var(--app-text)' }}>Кто может звонить</span><span className="text-blue-500 text-sm">Все</span></div>
-             </div>
-           </div>
-        )}
-
         {subPage === 'appearance' && (
           <motion.div key="appearance" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 pb-24">
             <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
             <h3 className="font-semibold mb-4" style={{ color: 'var(--app-text)' }}>Выберите тему</h3>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-3 mb-6">
                {themeList.map((key) => (
                   <button key={key} onClick={() => setTheme(key)} className="p-3 rounded-xl border flex flex-col items-center gap-2" style={{ background: theme === key ? 'var(--app-surface)' : 'transparent', borderColor: theme === key ? 'var(--app-accent)' : 'var(--app-border)' }}>
                     <div className="w-10 h-10 rounded-full" style={{ background: themes[key].accentGradient }} />
@@ -195,7 +180,20 @@ export default function SettingsView() {
                   </button>
                ))}
             </div>
+            <h3 className="flex items-center gap-2 font-semibold mb-4" style={{ color: 'var(--app-text)' }}><GlobeIcon size={20} /> Язык</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setLang('ru')} className={`py-2.5 rounded-xl font-medium border ${lang === 'ru' ? 'bg-blue-500 text-white' : 'text-gray-400'}`}>Русский</button>
+              <button onClick={() => setLang('en')} className={`py-2.5 rounded-xl font-medium border ${lang === 'en' ? 'bg-blue-500 text-white' : 'text-gray-400'}`}>English</button>
+            </div>
           </motion.div>
+        )}
+
+        {(subPage === 'privacy' || subPage === 'accounts' || subPage === 'notifications') && (
+           <div className="p-4">
+             <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
+             <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--app-text)' }}>Настройки</h2>
+             <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>Этот раздел скоро появится (в разработке).</p>
+           </div>
         )}
       </AnimatePresence>
     </div>
