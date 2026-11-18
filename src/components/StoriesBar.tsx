@@ -2,13 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { PlusIcon, HeartIcon } from '@/components/Icons';
+import { PlusIcon } from '@/components/Icons';
 
 export default function StoriesBar() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [stories, setStories] = useState<any[]>([]);
   const [viewingStory, setViewingStory] = useState<any | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -39,7 +38,6 @@ export default function StoriesBar() {
       expires_at: expiresAt
     });
     
-    setShowCreate(false);
     const { data } = await supabase.from('stories').select('*, profiles(username, avatar_url, display_name)').gt('expires_at', new Date().toISOString());
     if (data) setStories(data);
   };
@@ -58,7 +56,6 @@ export default function StoriesBar() {
 
       {uniqueUsers.map((story: any) => (
         <div key={story.id} className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => setViewingStory(story)}>
-          {/* ЗЕЛЕНОЕ КОЛЬЦО (если есть история) */}
           <div className="w-16 h-16 rounded-full p-[3px]" style={{ background: 'linear-gradient(45deg, #00ff87, #60efff)' }}>
             <img src={story.profiles?.avatar_url || ''} className="w-full h-full rounded-full object-cover border-2 border-[var(--app-bg)]" />
           </div>
@@ -66,7 +63,6 @@ export default function StoriesBar() {
         </div>
       ))}
 
-      {/* Просмотр истории */}
       <AnimatePresence>
         {viewingStory && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black flex flex-col">
@@ -80,7 +76,9 @@ export default function StoriesBar() {
             <img src={viewingStory.media_url} className="flex-1 w-full object-contain" />
             <div className="p-6 flex justify-center pb-10 z-10">
               <button className="flex items-center gap-2 bg-white/20 px-6 py-3 rounded-full backdrop-blur-md text-white">
-                <HeartIcon size={24} color="#ff4d4d" /> <span>{viewingStory.likes || 0}</span>
+                {/* ИКОНКА СЕРДЦА (ВСТРОЕННАЯ SVG, ЧТОБЫ НЕ БЫЛО ОШИБОК) */}
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff4d4d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                <span>{viewingStory.likes || 0}</span>
               </button>
             </div>
           </motion.div>
