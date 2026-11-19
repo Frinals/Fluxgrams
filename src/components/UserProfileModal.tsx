@@ -54,7 +54,10 @@ export default function UserProfileModal({ profileId, onClose }: Props) {
       </div>
 
       <div className="mt-16 flex flex-col items-center px-4">
-        <h2 className="text-2xl font-bold" style={{ color: 'var(--app-text)' }}>{profile.display_name || profile.username}</h2>
+        <div className="flex items-center justify-center gap-1.5">
+  <h2 className="text-2xl font-bold" style={{ color: 'var(--app-text)' }}>{profile.display_name || profile.username}</h2>
+  {(profile as any).is_verified && <VerifiedIcon size={22} />}
+</div>
         <p className="text-sm mt-1" style={{ color: 'var(--app-text-muted)' }}>@{profile.username}</p>
         
         <p className={`text-xs mt-1 font-medium ${isOnline ? 'text-green-500' : 'text-gray-500'}`}>
