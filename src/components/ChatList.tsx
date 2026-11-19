@@ -11,13 +11,29 @@ function ringColor(id: string) { const hash = id.split('').reduce((a, c) => a + 
 
 export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: any) {
   const { user, profile } = useAuth();
+  const { lang } = useLanguage();
   const [chats, setChats] = useState<any[]>([]);
   const [savedMessagesChatId, setSavedMessagesChatId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
 
+  // Статус загрузки (текст сверху)
+  const [statusText, setStatusText] = useState(lang === 'ru' ? 'Соединение...' : 'Connecting...');
+
+  useEffect(() => {
+    if (!loading) {
+      setStatusText('Flux');
+      return;
+    }
+    setStatusText(lang === 'ru' ? 'Устанавливаем соединение...' : 'Connecting...');
+    const t1 = setTimeout(() => setStatusText(lang === 'ru' ? 'Проверяем чаты...' : 'Checking chats...'), 800);
+    return () => { clearTimeout(t1); };
+  }, [loading, lang]);
+
   const loadChats = useCallback(async () => {
     if (!user) return;
+    
+    // Загружаем личные чаты
     const { data: myChats } = await supabase.from('chats').select('*').or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
     
     if (myChats && myChats.length > 0) {
@@ -29,51 +45,74 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: any
         return { ...chat, peer };
       }).filter(c => c.peer);
       setChats(previews);
-    } else { setChats([]); }
+    } else { 
+      setChats([]); 
+    }
 
+    // Загружаем Избранное
     const { data: sChat } = await supabase.rpc('get_or_create_self_chat');
     if (sChat) setSavedMessagesChatId(sChat);
 
     setLoading(false);
   }, [user]);
 
-  useEffect(() => { loadChats(); }, [loadChats]);
+  useEffect(() => { 
+    loadChats(); 
+    // Слушаем новые сообщения для обновления списка
+    const channel = supabase.channel('chat_list_updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => loadChats())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [loadChats]);
 
   return (
     <div className="flex flex-col h-full relative" style={{ background: 'var(--app-bg)' }}>
       <div className="sticky top-0 z-20 px-5 py-4 glass-nav border-b flex justify-between items-center" style={{ borderColor: 'var(--app-border-glass)' }}>
-        <h2 className="text-[26px] font-bold tracking-tight" style={{ color: 'var(--app-text)' }}>Чаты</h2>
+        <h2 className="text-[26px] font-bold tracking-tight" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Чаты' : 'Chats'}</h2>
+        <span className="text-xs font-medium px-3 py-1 rounded-full bg-white/5 border border-white/10" style={{ color: loading ? 'var(--app-accent)' : 'var(--app-text-muted)' }}>{statusText}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto pb-28">
         <StoriesBar />
         <div className="px-2 pt-2">
-          {loading ? <div className="flex justify-center p-10"><div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--app-accent)' }} /></div> : (
+          {loading ? (
+            <div className="flex justify-center p-10">
+              <p className="text-sm font-medium animate-pulse" style={{ color: 'var(--app-accent)' }}>{statusText}</p>
+            </div>
+          ) : (
             <>
               {savedMessagesChatId && (
-                <ListItem id="saved" fallbackIcon={<BookmarkIcon size={22} />} name="Избранное" message="Личные заметки" onClick={() => onOpenChat(savedMessagesChatId, profile)} isSaved />
+                <ListItem id="saved" fallbackIcon={<BookmarkIcon size={22} />} name={lang === 'ru' ? 'Избранное' : 'Saved Messages'} message={lang === 'ru' ? 'Личные заметки' : 'Personal notes'} onClick={() => onOpenChat(savedMessagesChatId, profile)} isSaved />
               )}
               {chats.map((c) => (
-                 <ListItem key={c.id} id={c.peer.id} avatarUrl={c.peer.avatar_url} fallbackText={(c.peer.display_name || '?').slice(0,2).toUpperCase()} name={c.peer.display_name || c.peer.username} message="Нажмите, чтобы открыть" onClick={() => onOpenChat(c.id, c.peer)} />
+                 <ListItem key={c.id} id={c.peer.id} avatarUrl={c.peer.avatar_url} fallbackText={(c.peer.display_name || '?').slice(0,2).toUpperCase()} name={c.peer.display_name || c.peer.username} message={lang === 'ru' ? 'Нажмите, чтобы открыть' : 'Tap to open'} onClick={() => onOpenChat(c.id, c.peer)} />
               ))}
             </>
           )}
         </div>
       </div>
       
+      {/* ПЛАВАЮЩАЯ КНОПКА "+" */}
       <div className="fixed bottom-[100px] right-5 z-30">
         <motion.button whileTap={{ scale: 0.85 }} onClick={() => setShowCreateMenu(!showCreateMenu)} className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg" style={{ background: 'var(--app-accent)', color: '#fff' }}>
           <motion.div animate={{ rotate: showCreateMenu ? 45 : 0 }}><PlusIcon size={26} /></motion.div>
         </motion.button>
       </div>
 
+      {/* МЕНЮ СОЗДАНИЯ */}
       <AnimatePresence>
         {showCreateMenu && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-30" onClick={() => setShowCreateMenu(false)} />
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-40 right-5 z-40 rounded-3xl p-2 shadow-2xl border glass-panel" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
-              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('group'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5"><GroupIcon size={18} /><span className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>Новая группа</span></button>
-              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('channel'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5"><ChannelIcon size={18} /><span className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>Новый канал</span></button>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm" onClick={() => setShowCreateMenu(false)} />
+            <motion.div initial={{ opacity: 0, y: 20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.9 }} className="fixed bottom-40 right-5 z-40 rounded-3xl p-2 shadow-2xl border glass-panel" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
+              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('group'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors">
+                <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center"><GroupIcon size={18} style={{ color: '#54a0ff' }} /></div>
+                <span className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Новая группа' : 'New Group'}</span>
+              </button>
+              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('channel'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors">
+                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center"><ChannelIcon size={18} style={{ color: '#9b59b6' }} /></div>
+                <span className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Новый канал' : 'New Channel'}</span>
+              </button>
             </motion.div>
           </>
         )}
