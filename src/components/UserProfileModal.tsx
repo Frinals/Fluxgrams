@@ -46,9 +46,8 @@ export default function UserProfileModal({ profileId, onClose }: Props) {
         </button>
       </div>
 
-      {/* Баннер */}
       <div className="relative h-48 bg-gradient-to-r from-blue-600 to-purple-600 flex justify-center items-end pb-0">
-        {profile.banner_url && <img src={profile.banner_url} className="absolute inset-0 w-full h-full object-cover" />}
+        {(profile as any).banner_url && <img src={(profile as any).banner_url} className="absolute inset-0 w-full h-full object-cover" />}
         <div className="relative z-10 absolute -bottom-12 w-24 h-24 rounded-full border-4 border-[var(--app-bg)] flex items-center justify-center text-3xl font-bold text-white shadow-xl" style={{ background: 'var(--app-accent)' }}>
           {profile.avatar_url ? <img src={profile.avatar_url} className="w-full h-full rounded-full object-cover" /> : initials}
         </div>
