@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback, FormEvent, memo } from 'react
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, Profile, Message } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { UserProfileModal } from '@/components/UserProfileModal';
-import { BackIcon, SendIcon, MicIcon, ImageIcon, PhoneIcon, TimerIcon, PlayIcon, PauseIcon, BookmarkIcon, ShieldIcon, TrashIcon } from '@/components/Icons';
+import UserProfileModal from '@/components/UserProfileModal'; // <--- ИСПРАВЛЕННЫЙ ИМПОРТ
+import { BackIcon, SendIcon, PhoneIcon, TimerIcon, BookmarkIcon, ShieldIcon, TrashIcon, ImageIcon } from '@/components/Icons';
 
 const EMOJIS = ['❤️', '👍', '😂', '🔥', '😮'];
 const springTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
@@ -34,7 +34,6 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: any) {
   useEffect(() => {
     loadMessages();
     
-    // МГНОВЕННОЕ ОБНОВЛЕНИЕ СООБЩЕНИЙ
     const channel = supabase.channel(`chat_fast:${chatId || group?.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         const newMsg = payload.new as Message;
@@ -76,7 +75,6 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: any) {
       <div className="flex items-center gap-3 p-4 glass-nav border-b z-20 sticky top-0" style={{ borderColor: 'var(--app-border-glass)' }}>
         <button onClick={onBack} className="p-2 rounded-full hover:bg-white/10 transition-colors"><BackIcon size={22} /></button>
         
-        {/* КЛИК ПО НИКУ ОТКРЫВАЕТ ПРОФИЛЬ */}
         <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => { if (!isSelfChat && !isGroupChat) setShowProfile(true); }}>
           <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold bg-blue-500">{(headerName || 'U').slice(0,2).toUpperCase()}</div>
           <div className="flex-1 min-w-0">
