@@ -156,3 +156,11 @@ export const LockShieldIcon = ShieldIcon;
 export const XIcon = ({ size = 24, color = "currentColor", ...props }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
 );
+export const VerifiedIcon = ({ size = 20, ...props }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    {/* Волнистый зеленый круг */}
+    <path d="M12 2C13.5 2 14.5 3.5 15.5 4C16.5 4.5 18 4 19 5C20 6 19.5 7.5 20 8.5C20.5 9.5 22 10.5 22 12C22 13.5 20.5 14.5 20 15.5C19.5 16.5 20 18 19 19C18 20 16.5 19.5 15.5 20C14.5 20.5 13.5 22 12 22C10.5 22 9.5 20.5 8.5 20C7.5 19.5 6 20 5 19C4 18 4.5 16.5 4 15.5C3.5 14.5 2 13.5 2 12C2 10.5 3.5 9.5 4 8.5C4.5 7.5 4 6 5 5C6 4 7.5 4.5 8.5 4C9.5 3.5 10.5 2 12 2Z" fill="#2ecc71"/>
+    {/* Белая галочка */}
+    <path d="M8 12L11 15L16 9" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
