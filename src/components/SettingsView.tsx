@@ -205,7 +205,10 @@ export default function SettingsView() {
         {(subPage === 'privacy' || subPage === 'accounts' || subPage === 'notifications') && (
            <div className="p-4">
              <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> {lang === 'ru' ? 'Назад' : 'Back'}</button>
-             <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--app-text)' }}>{subPage.toUpperCase()}</h2>
+             <div className="flex items-center justify-center gap-1.5 mt-3">
+  <h2 className="text-2xl font-bold" style={{ color: 'var(--app-text)' }}>{displayName}</h2>
+  {(profile as any)?.is_verified && <VerifiedIcon size={24} />}
+</div>
              <div className="p-4 glass-panel rounded-2xl">
                 <p className="text-sm text-center" style={{ color: 'var(--app-text-muted)' }}>{lang === 'ru' ? 'Этот раздел скоро появится.' : 'This section is coming soon.'}</p>
              </div>
