@@ -41,6 +41,23 @@ function MessengerApp() {
     }
   }, []);
 
+  // НАСТОЯЩИЙ СТАТУС "В СЕТИ" (Обновляем каждую минуту)
+  useEffect(() => {
+    if (!user) return;
+
+    const updateStatus = () => {
+      supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id).then();
+    };
+    
+    // Обновляем сразу при заходе
+    updateStatus();
+
+    // И потом каждые 60 секунд
+    const interval = setInterval(updateStatus, 60000);
+
+    return () => clearInterval(interval);
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
     const notifChannel = supabase.channel('global_notifications')
