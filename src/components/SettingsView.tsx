@@ -5,11 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { themes, themeList } from '@/lib/types';
-import { 
-  UserIcon, LockIcon, GlobeIcon, PaletteIcon, LogOutIcon, CheckIcon, 
-  ChevronRightIcon, MusicIcon, BellIcon, BackIcon, UsersIcon, 
-  AddUserIcon, PlayIcon, PauseIcon, ImageIcon 
-} from '@/components/Icons';
+import { UserIcon, LockIcon, GlobeIcon, PaletteIcon, LogOutIcon, CheckIcon, ChevronRightIcon, MusicIcon, BellIcon, BackIcon, UsersIcon, AddUserIcon, PlayIcon, PauseIcon, ImageIcon, VerifiedIcon } from '@/components/Icons';
 
 type SubPage = 'main' | 'profile' | 'privacy' | 'appearance' | 'notifications' | 'accounts';
 const springTransition = { type: 'spring' as const, stiffness: 300, damping: 30 };
@@ -70,14 +66,8 @@ export default function SettingsView() {
     setSaving(true);
     
     const updates: any = {
-      display_name: displayName, 
-      username: username.replace(/[^a-zA-Z0-9_]/g, ''), 
-      bio, 
-      avatar_url: avatarUrl, 
-      banner_url: bannerUrl, 
-      profile_song_url: songUrl, 
-      song_title: songTitle, 
-      song_artist: songArtist,
+      display_name: displayName, username: username.replace(/[^a-zA-Z0-9_]/g, ''), bio, 
+      avatar_url: avatarUrl, banner_url: bannerUrl, profile_song_url: songUrl, song_title: songTitle, song_artist: songArtist,
     };
 
     const { error } = await supabase.from('profiles').update(updates).eq('id', user.id);
@@ -100,13 +90,18 @@ export default function SettingsView() {
     <div className="flex flex-col h-full overflow-y-auto" style={{ background: 'var(--app-bg)' }}>
       <AnimatePresence mode="wait">
         
-        {/* ГЛАВНЫЙ ЭКРАН */}
         {subPage === 'main' && (
           <motion.div key="main" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={springTransition} className="p-4 space-y-3 pb-24">
             <h2 className="text-[26px] font-bold mb-4" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Настройки' : 'Settings'}</h2>
             <div className="glass-panel rounded-3xl p-5 flex items-center gap-4 mb-4 cursor-pointer" onClick={() => setSubPage('profile')}>
               {avatarUrl ? <img src={avatarUrl} className="w-16 h-16 rounded-full object-cover" /> : <div className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-xl text-white" style={{ background: 'var(--app-accent)' }}>{initials}</div>}
-              <div className="flex-1"><p className="font-bold text-lg" style={{ color: 'var(--app-text)' }}>{displayName || 'User'}</p><p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>@{profile?.username}</p></div>
+              <div className="flex-1">
+                <div className="flex items-center gap-1">
+                  <p className="font-bold text-lg" style={{ color: 'var(--app-text)' }}>{displayName || 'User'}</p>
+                  {(profile as any)?.is_verified && <VerifiedIcon size={18} />}
+                </div>
+                <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>@{profile?.username}</p>
+              </div>
               <ChevronRightIcon size={18} style={{ color: 'var(--app-text-muted)' }} />
             </div>
             {cards.map(({ key, icon: Icon, label, desc }) => (
@@ -119,14 +114,11 @@ export default function SettingsView() {
           </motion.div>
         )}
 
-        {/* ПРОФИЛЬ */}
         {subPage === 'profile' && (
           <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full overflow-y-auto pb-24">
             <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-center">
               <button onClick={() => setSubPage('main')} className="p-2 rounded-full bg-black/40 text-white backdrop-blur-md"><BackIcon size={22} /></button>
-              <button onClick={() => setEditMode('editAll')} className="p-2 rounded-full bg-black/40 text-white backdrop-blur-md">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-              </button>
+              <button onClick={() => setEditMode('editAll')} className="p-2 rounded-full bg-black/40 text-white backdrop-blur-md"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
             </div>
             
             <div className="h-40 w-full relative bg-gray-800 cursor-pointer" onClick={() => bannerInputRef.current?.click()}>
@@ -140,22 +132,23 @@ export default function SettingsView() {
               </div>
               <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(e) => handleUpload(e, 'avatar')} />
 
-              <h2 className="text-2xl font-bold mt-3" style={{ color: 'var(--app-text)' }}>{displayName}</h2>
+              <div className="flex items-center gap-1.5 mt-3">
+                <h2 className="text-2xl font-bold" style={{ color: 'var(--app-text)' }}>{displayName}</h2>
+                {(profile as any)?.is_verified && <VerifiedIcon size={24} />}
+              </div>
               <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>@{profile?.username}</p>
               
               <div className="w-full px-4 mt-4 text-center">
-                <p className="text-sm font-semibold mb-1" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'О себе' : 'About me'}</p>
-                <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>{bio || (lang === 'ru' ? 'Нет описания' : 'No description')}</p>
+                <p className="text-sm font-semibold mb-1" style={{ color: 'var(--app-text)' }}>О себе</p>
+                <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>{bio || 'Нет описания'}</p>
               </div>
 
               <div className="w-full px-4 mt-6">
-                <p className="text-sm font-semibold mb-2" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Музыка' : 'Music'}</p>
+                <p className="text-sm font-semibold mb-2" style={{ color: 'var(--app-text)' }}>Музыка</p>
                 {songUrl ? (
                   <CustomAudioPlayer url={songUrl} title={songTitle} artist={songArtist} onUploadClick={() => songInputRef.current?.click()} />
                 ) : (
-                  <button onClick={() => songInputRef.current?.click()} className="w-full py-3 rounded-xl border border-dashed flex justify-center items-center gap-2 text-sm" style={{ borderColor: 'var(--app-border)', color: 'var(--app-text-muted)' }}>
-                    <MusicIcon size={18} /> {lang === 'ru' ? 'Загрузить трек' : 'Upload track'}
-                  </button>
+                  <button onClick={() => songInputRef.current?.click()} className="w-full py-3 rounded-xl border border-dashed flex justify-center items-center gap-2 text-sm" style={{ borderColor: 'var(--app-border)', color: 'var(--app-text-muted)' }}><MusicIcon size={18} /> Загрузить трек</button>
                 )}
                 <input ref={songInputRef} type="file" accept="audio/*" hidden onChange={(e) => handleUpload(e, 'song')} />
               </div>
@@ -164,15 +157,15 @@ export default function SettingsView() {
             {editMode === 'editAll' && (
               <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
                 <div className="glass-panel p-5 rounded-2xl w-full max-w-sm space-y-4">
-                  <h3 className="font-bold text-lg" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Редактировать' : 'Edit'}</h3>
-                  <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={lang === 'ru' ? 'Имя' : 'Name'} className="w-full p-2 rounded-xl border bg-transparent" style={{ color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
-                  <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={lang === 'ru' ? 'Юзернейм' : 'Username'} className="w-full p-2 rounded-xl border bg-transparent" style={{ color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
-                  <textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder={lang === 'ru' ? 'Био' : 'Bio'} className="w-full p-2 rounded-xl border bg-transparent" style={{ color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
-                  <input value={songTitle} onChange={(e) => setSongTitle(e.target.value)} placeholder={lang === 'ru' ? 'Название песни' : 'Song Title'} className="w-full p-2 rounded-xl border bg-transparent text-sm" style={{ color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
-                  <input value={songArtist} onChange={(e) => setSongArtist(e.target.value)} placeholder={lang === 'ru' ? 'Исполнитель' : 'Artist'} className="w-full p-2 rounded-xl border bg-transparent text-sm" style={{ color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
+                  <h3 className="font-bold text-lg" style={{ color: 'var(--app-text)' }}>Редактировать</h3>
+                  <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Имя" className="w-full p-2 rounded-xl border bg-transparent" style={{ color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
+                  <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ник" className="w-full p-2 rounded-xl border bg-transparent" style={{ color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
+                  <textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="О себе" className="w-full p-2 rounded-xl border bg-transparent" style={{ color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
+                  <input value={songTitle} onChange={(e) => setSongTitle(e.target.value)} placeholder="Название песни" className="w-full p-2 rounded-xl border bg-transparent text-sm" style={{ color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
+                  <input value={songArtist} onChange={(e) => setSongArtist(e.target.value)} placeholder="Исполнитель" className="w-full p-2 rounded-xl border bg-transparent text-sm" style={{ color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
                   <div className="flex gap-2 pt-2">
-                    <button onClick={() => setEditMode('none')} className="flex-1 py-2 rounded-xl border" style={{ borderColor: 'var(--app-border)', color: 'var(--app-text)' }}>{lang === 'ru' ? 'Отмена' : 'Cancel'}</button>
-                    <button onClick={() => handleSave()} disabled={saving} className="flex-1 py-2 rounded-xl text-white bg-blue-500">{saving ? '...' : (lang === 'ru' ? 'Сохранить' : 'Save')}</button>
+                    <button onClick={() => setEditMode('none')} className="flex-1 py-2 rounded-xl border" style={{ borderColor: 'var(--app-border)', color: 'var(--app-text)' }}>Отмена</button>
+                    <button onClick={() => handleSave()} disabled={saving} className="flex-1 py-2 rounded-xl text-white bg-blue-500">{saving ? '...' : 'Сохранить'}</button>
                   </div>
                 </div>
               </div>
@@ -180,11 +173,61 @@ export default function SettingsView() {
           </motion.div>
         )}
 
-        {/* ОФОРМЛЕНИЕ */}
+        {/* РАБОЧИЙ ЭКРАН ПРИВАТНОСТИ (Без белого экрана) */}
+        {subPage === 'privacy' && (
+           <div className="p-4 pb-24">
+             <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
+             <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--app-text)' }}>Конфиденциальность</h2>
+             <div className="glass-panel rounded-2xl p-5 space-y-4">
+                <div className="flex justify-between items-center border-b border-[var(--app-border)] pb-3">
+                  <span style={{ color: 'var(--app-text)' }}>Кто может писать</span>
+                  <span className="text-blue-500 text-sm font-medium">Все</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-[var(--app-border)] pb-3">
+                  <span style={{ color: 'var(--app-text)' }}>Кто может звонить</span>
+                  <span className="text-blue-500 text-sm font-medium">Все</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span style={{ color: 'var(--app-text)' }}>Режим призрака (Ghost Mode)</span>
+                  <span className="text-gray-500 text-sm font-medium">Выкл</span>
+                </div>
+             </div>
+           </div>
+        )}
+
+        {/* РАБОЧИЙ ЭКРАН УВЕДОМЛЕНИЙ */}
+        {subPage === 'notifications' && (
+           <div className="p-4 pb-24">
+             <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
+             <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--app-text)' }}>Уведомления</h2>
+             <div className="glass-panel rounded-2xl p-5 space-y-4">
+                <div className="flex justify-between items-center border-b border-[var(--app-border)] pb-3">
+                  <span style={{ color: 'var(--app-text)' }}>Звук</span>
+                  <span className="text-blue-500 text-sm font-medium">Вкл</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span style={{ color: 'var(--app-text)' }}>Вибрация</span>
+                  <span className="text-blue-500 text-sm font-medium">Вкл</span>
+                </div>
+             </div>
+           </div>
+        )}
+
+        {subPage === 'accounts' && (
+           <div className="p-4 pb-24">
+             <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
+             <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--app-text)' }}>Аккаунты</h2>
+             <div className="p-4 glass-panel rounded-2xl flex justify-between items-center">
+                <span style={{ color: 'var(--app-text)' }}>@{profile?.username}</span>
+                <span className="text-green-500 text-sm font-medium">Активный</span>
+             </div>
+           </div>
+        )}
+
         {subPage === 'appearance' && (
           <motion.div key="appearance" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 pb-24">
-            <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> {lang === 'ru' ? 'Назад' : 'Back'}</button>
-            <h3 className="font-semibold mb-4" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Выберите тему' : 'Choose theme'}</h3>
+            <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
+            <h3 className="font-semibold mb-4" style={{ color: 'var(--app-text)' }}>Выберите тему</h3>
             <div className="grid grid-cols-3 gap-3 mb-6">
                {themeList.map((key) => (
                   <button key={key} onClick={() => setTheme(key)} className="p-3 rounded-xl border flex flex-col items-center gap-2" style={{ background: theme === key ? 'var(--app-surface)' : 'transparent', borderColor: theme === key ? 'var(--app-accent)' : 'var(--app-border)' }}>
@@ -193,26 +236,12 @@ export default function SettingsView() {
                   </button>
                ))}
             </div>
-            <h3 className="flex items-center gap-2 font-semibold mb-4" style={{ color: 'var(--app-text)' }}><GlobeIcon size={20} /> {lang === 'ru' ? 'Язык' : 'Language'}</h3>
+            <h3 className="flex items-center gap-2 font-semibold mb-4" style={{ color: 'var(--app-text)' }}><GlobeIcon size={20} /> Язык</h3>
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setLang('ru')} className={`py-2.5 rounded-xl font-medium border ${lang === 'ru' ? 'bg-blue-500 text-white border-transparent' : 'text-gray-400 border-[var(--app-border)]'}`}>Русский</button>
-              <button onClick={() => setLang('en')} className={`py-2.5 rounded-xl font-medium border ${lang === 'en' ? 'bg-blue-500 text-white border-transparent' : 'text-gray-400 border-[var(--app-border)]'}`}>English</button>
+              <button onClick={() => setLang('ru')} className={`py-2.5 rounded-xl font-medium border ${lang === 'ru' ? 'bg-blue-500 text-white' : 'text-gray-400'}`}>Русский</button>
+              <button onClick={() => setLang('en')} className={`py-2.5 rounded-xl font-medium border ${lang === 'en' ? 'bg-blue-500 text-white' : 'text-gray-400'}`}>English</button>
             </div>
           </motion.div>
-        )}
-
-        {/* ОСТАЛЬНЫЕ ВКЛАДКИ-ЗАГЛУШКИ */}
-        {(subPage === 'privacy' || subPage === 'accounts' || subPage === 'notifications') && (
-           <div className="p-4">
-             <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> {lang === 'ru' ? 'Назад' : 'Back'}</button>
-             <div className="flex items-center justify-center gap-1.5 mt-3">
-  <h2 className="text-2xl font-bold" style={{ color: 'var(--app-text)' }}>{displayName}</h2>
-  {(profile as any)?.is_verified && <VerifiedIcon size={24} />}
-</div>
-             <div className="p-4 glass-panel rounded-2xl">
-                <p className="text-sm text-center" style={{ color: 'var(--app-text-muted)' }}>{lang === 'ru' ? 'Этот раздел скоро появится.' : 'This section is coming soon.'}</p>
-             </div>
-           </div>
         )}
       </AnimatePresence>
     </div>
@@ -222,13 +251,7 @@ export default function SettingsView() {
 const CustomAudioPlayer = memo(function CustomAudioPlayer({ url, title, artist, onUploadClick }: { url: string, title: string, artist: string, onUploadClick: () => void }) {
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
-  
-  const toggle = () => { 
-    if (!audioRef.current) return; 
-    if (playing) audioRef.current.pause(); else audioRef.current.play(); 
-    setPlaying(!playing); 
-  };
-  
+  const toggle = () => { if (!audioRef.current) return; if (playing) audioRef.current.pause(); else audioRef.current.play(); setPlaying(!playing); };
   return (
     <div className="w-full rounded-2xl p-3 flex items-center gap-3 border relative overflow-hidden" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
       <button onClick={toggle} className="w-12 h-12 rounded-full flex items-center justify-center text-white shrink-0" style={{ background: 'var(--app-accent)' }}>
