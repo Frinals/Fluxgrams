@@ -27,7 +27,6 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: any
     if (!user) return;
     setLoading(true);
     
-    // ФИКС: try/catch/finally гарантирует, что загрузка завершится даже при ошибке сети
     try {
       const { data: myChats } = await supabase.from('chats').select('*').or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
       
@@ -49,7 +48,6 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: any
     } catch (error) {
       console.error("Ошибка загрузки чатов:", error);
     } finally {
-      // ФИКС: Выключаем загрузку при любом исходе
       setLoading(false);
     }
   }, [user]);
