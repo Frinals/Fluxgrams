@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { supabase, Profile } from '@/lib/supabase';
 import { BackIcon, PlayIcon, PauseIcon, GiftIcon } from '@/components/Icons';
 
@@ -39,7 +40,14 @@ export default function UserProfileModal({ profileId, onClose }: Props) {
   const initials = (profile.display_name || profile.username || '?').slice(0, 2).toUpperCase();
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col overflow-y-auto" style={{ background: 'var(--app-bg)' }}>
+    <motion.div 
+      initial={{ y: "100%" }} 
+      animate={{ y: 0 }} 
+      exit={{ y: "100%" }} 
+      transition={{ type: "spring", damping: 25, stiffness: 300 }}
+      className="fixed inset-0 z-[100] flex flex-col overflow-y-auto" 
+      style={{ background: 'var(--app-bg)' }}
+    >
       <div className="sticky top-0 z-10 p-4 flex items-center">
         <button onClick={onClose} className="p-2 rounded-full bg-black/20 text-white backdrop-blur-md">
           <BackIcon size={24} />
@@ -54,10 +62,7 @@ export default function UserProfileModal({ profileId, onClose }: Props) {
       </div>
 
       <div className="mt-16 flex flex-col items-center px-4">
-        <div className="flex items-center justify-center gap-1.5">
-  <h2 className="text-2xl font-bold" style={{ color: 'var(--app-text)' }}>{profile.display_name || profile.username}</h2>
-  {(profile as any).is_verified && <VerifiedIcon size={22} />}
-</div>
+        <h2 className="text-2xl font-bold" style={{ color: 'var(--app-text)' }}>{profile.display_name || profile.username}</h2>
         <p className="text-sm mt-1" style={{ color: 'var(--app-text-muted)' }}>@{profile.username}</p>
         
         <p className={`text-xs mt-1 font-medium ${isOnline ? 'text-green-500' : 'text-gray-500'}`}>
@@ -90,6 +95,6 @@ export default function UserProfileModal({ profileId, onClose }: Props) {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
