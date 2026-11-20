@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -23,29 +23,7 @@ interface OutgoingCallState {
 
 const springTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
-// ЗАЩИТА ОТ ЧЕРНОГО ЭКРАНА
-class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: 20, background: '#ff4444', color: 'white', minHeight: '100vh', zIndex: 9999, position: 'relative' }}>
-          <h1 style={{ fontSize: 24, fontWeight: 'bold' }}>Ошибка приложения!</h1>
-          <p style={{ marginTop: 10, fontSize: 16 }}>{this.state.error?.message}</p>
-          <button onClick={() => window.location.reload()} style={{ marginTop: 20, padding: 10, background: 'white', color: 'red', borderRadius: 8 }}>Перезагрузить</button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
+// Компонент для красивых всплывающих уведомлений
 function GlobalNotifications() {
   const { user } = useAuth();
   const [notif, setNotif] = useState<{ title: string; body: string } | null>(null);
@@ -54,24 +32,32 @@ function GlobalNotifications() {
     if (!user) return;
     const channel = supabase.channel('global_banners')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-        if (payload.new && payload.new.sender_id === user.id) return;
-        setNotif({ title: 'Новое сообщение', body: payload.new?.content || 'Вложение' });
+        if (payload.new.sender_id === user.id) return; // Не показываем свои же сообщения
+        setNotif({ title: 'Новое сообщение', body: payload.new.content || 'Вложение' });
         setTimeout(() => setNotif(null), 4000); 
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
-  if (!notif) return null;
-
   return (
-    <motion.div initial={{ y: -100, opacity: 0 }} animate={{ y: 20, opacity: 1 }} exit={{ y: -100, opacity: 0 }} className="fixed top-0 left-4 right-4 z-[999] glass-panel p-4 rounded-2xl flex items-center gap-3 shadow-2xl" style={{ borderColor: 'var(--app-accent)' }}>
-      <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">F</div>
-      <div className="flex-1">
-        <p className="font-bold text-sm" style={{ color: 'var(--app-text)' }}>{notif.title}</p>
-        <p className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{notif.body}</p>
-      </div>
-    </motion.div>
+    <AnimatePresence>
+      {notif && (
+        <motion.div 
+          initial={{ y: -100, opacity: 0 }} 
+          animate={{ y: 20, opacity: 1 }} 
+          exit={{ y: -100, opacity: 0 }} 
+          className="fixed top-0 left-4 right-4 z-[999] glass-panel p-4 rounded-2xl flex items-center gap-3 shadow-2xl" 
+          style={{ borderColor: 'var(--app-accent)' }}
+        >
+          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">F</div>
+          <div className="flex-1">
+            <p className="font-bold text-sm" style={{ color: 'var(--app-text)' }}>{notif.title}</p>
+            <p className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{notif.body}</p>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -86,6 +72,7 @@ function MessengerApp() {
 
   const triggerChatRefresh = () => setChatRefreshKey(prev => prev + 1);
 
+  // Статус "В сети"
   useEffect(() => {
     if (!user) return;
     const updateStatus = () => supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id).then();
@@ -111,16 +98,29 @@ function MessengerApp() {
   };
 
   if (loading) {
-    return <div className="min-h-screen" style={{ background: 'var(--app-bg)' }} />;
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--app-bg)' }}>
+        <div className="w-10 h-10 border-4 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--app-accent)' }} />
+      </div>
+    );
   }
 
   if (!user || needsEmailVerification) return <AuthScreen />;
 
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: 'var(--app-bg)' }}>
+      
       <GlobalNotifications />
       <IncomingCallModal />
-      {outgoingCall && <OutgoingCallModal peer={outgoingCall.peer} callType={outgoingCall.callType} chatId={outgoingCall.chatId} onCancel={() => setOutgoingCall(null)} />}
+      
+      {outgoingCall && (
+        <OutgoingCallModal 
+          peer={outgoingCall.peer} 
+          callType={outgoingCall.callType} 
+          chatId={outgoingCall.chatId} 
+          onCancel={() => setOutgoingCall(null)} 
+        />
+      )}
       
       <div className="max-w-3xl mx-auto h-screen flex flex-col">
         <div className="flex-1 overflow-hidden" style={{ paddingBottom: openChat || openGroup ? 0 : '5.5rem' }}>
@@ -144,7 +144,9 @@ function MessengerApp() {
           </AnimatePresence>
         </div>
       </div>
+      
       {!openChat && !openGroup && <BottomNav active={activeTab} onChange={setActiveTab} />}
+      
       <AnimatePresence>
         {createModalType && <CreateGroupModal type={createModalType} onClose={() => setCreateModalType(null)} onCreated={handleGroupCreated} />}
       </AnimatePresence>
@@ -154,14 +156,12 @@ function MessengerApp() {
 
 export default function App() {
   return (
-    <ErrorBoundary>
-      <ThemeProvider>
-        <LanguageProvider>
-          <AuthProvider>
-            <MessengerApp />
-          </AuthProvider>
-        </LanguageProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
+    <ThemeProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <MessengerApp />
+        </AuthProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   );
-                                                                                                                    }
+}
