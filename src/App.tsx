@@ -23,44 +23,6 @@ interface OutgoingCallState {
 
 const springTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
-// Компонент для красивых всплывающих уведомлений
-function GlobalNotifications() {
-  const { user } = useAuth();
-  const [notif, setNotif] = useState<{ title: string; body: string } | null>(null);
-
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase.channel('global_banners')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-        if (payload.new.sender_id === user.id) return; // Не показываем свои же сообщения
-        setNotif({ title: 'Новое сообщение', body: payload.new.content || 'Вложение' });
-        setTimeout(() => setNotif(null), 4000); 
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user]);
-
-  return (
-    <AnimatePresence>
-      {notif && (
-        <motion.div 
-          initial={{ y: -100, opacity: 0 }} 
-          animate={{ y: 20, opacity: 1 }} 
-          exit={{ y: -100, opacity: 0 }} 
-          className="fixed top-0 left-4 right-4 z-[999] glass-panel p-4 rounded-2xl flex items-center gap-3 shadow-2xl" 
-          style={{ borderColor: 'var(--app-accent)' }}
-        >
-          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">F</div>
-          <div className="flex-1">
-            <p className="font-bold text-sm" style={{ color: 'var(--app-text)' }}>{notif.title}</p>
-            <p className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{notif.body}</p>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
 function MessengerApp() {
   const { user, loading, needsEmailVerification } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('chats');
@@ -72,7 +34,6 @@ function MessengerApp() {
 
   const triggerChatRefresh = () => setChatRefreshKey(prev => prev + 1);
 
-  // Статус "В сети"
   useEffect(() => {
     if (!user) return;
     const updateStatus = () => supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id).then();
@@ -110,16 +71,10 @@ function MessengerApp() {
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: 'var(--app-bg)' }}>
       
-      <GlobalNotifications />
       <IncomingCallModal />
       
       {outgoingCall && (
-        <OutgoingCallModal 
-          peer={outgoingCall.peer} 
-          callType={outgoingCall.callType} 
-          chatId={outgoingCall.chatId} 
-          onCancel={() => setOutgoingCall(null)} 
-        />
+        <OutgoingCallModal peer={outgoingCall.peer} callType={outgoingCall.callType} chatId={outgoingCall.chatId} onCancel={() => setOutgoingCall(null)} />
       )}
       
       <div className="max-w-3xl mx-auto h-screen flex flex-col">
@@ -144,9 +99,7 @@ function MessengerApp() {
           </AnimatePresence>
         </div>
       </div>
-      
       {!openChat && !openGroup && <BottomNav active={activeTab} onChange={setActiveTab} />}
-      
       <AnimatePresence>
         {createModalType && <CreateGroupModal type={createModalType} onClose={() => setCreateModalType(null)} onCreated={handleGroupCreated} />}
       </AnimatePresence>
