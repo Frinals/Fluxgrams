@@ -23,6 +23,34 @@ interface OutgoingCallState {
 
 const springTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
+function GlobalNotifications() {
+  const { user } = useAuth();
+  const [notif, setNotif] = useState<{ title: string; body: string } | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase.channel('global_banners')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, (payload) => {
+        setNotif({ title: 'Новое сообщение', body: payload.new.content || 'Вложение' });
+        setTimeout(() => setNotif(null), 4000); // Скрываем через 4 секунды
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  if (!notif) return null;
+
+  return (
+    <motion.div initial={{ y: -100, opacity: 0 }} animate={{ y: 20, opacity: 1 }} exit={{ y: -100, opacity: 0 }} className="fixed top-0 left-4 right-4 z-[999] glass-panel p-4 rounded-2xl flex items-center gap-3 shadow-2xl" style={{ borderColor: 'var(--app-accent)' }}>
+      <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">F</div>
+      <div className="flex-1">
+        <p className="font-bold text-sm" style={{ color: 'var(--app-text)' }}>{notif.title}</p>
+        <p className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{notif.body}</p>
+      </div>
+    </motion.div>
+  );
+}
+
 function MessengerApp() {
   const { user, loading, needsEmailVerification } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('chats');
@@ -30,54 +58,17 @@ function MessengerApp() {
   const [openGroup, setOpenGroup] = useState<Group | null>(null);
   const [outgoingCall, setOutgoingCall] = useState<OutgoingCallState | null>(null);
   const [createModalType, setCreateModalType] = useState<GroupType | null>(null);
-
   const [chatRefreshKey, setChatRefreshKey] = useState(0);
+
   const triggerChatRefresh = () => setChatRefreshKey(prev => prev + 1);
 
-  // Безопасный запрос уведомлений
-  useEffect(() => {
-    if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
-      Notification.requestPermission().catch(() => {});
-    }
-  }, []);
-
-  // НАСТОЯЩИЙ СТАТУС "В СЕТИ" (Обновляем каждую минуту)
   useEffect(() => {
     if (!user) return;
-
-    const updateStatus = () => {
-      supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id).then();
-    };
-    
-    // Обновляем сразу при заходе
+    // Обновляем статус "В сети"
+    const updateStatus = () => supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id).then();
     updateStatus();
-
-    // И потом каждые 60 секунд
     const interval = setInterval(updateStatus, 60000);
-
     return () => clearInterval(interval);
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    const notifChannel = supabase.channel('global_notifications')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'messages', 
-        filter: `receiver_id=eq.${user.id}`
-      }, (payload) => {
-        if (document.hidden && Notification.permission === "granted") {
-          try {
-            new Notification("Новое сообщение в Fluxgram!", {
-              body: payload.new.content || "Отправил файл",
-            });
-          } catch (e) {}
-        }
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(notifChannel); };
   }, [user]);
 
   const handleCall = async (peer: Profile, callType: 'audio' | 'video') => {
@@ -96,25 +87,20 @@ function MessengerApp() {
     });
   };
 
-  if (loading) {
-    return <div className="min-h-screen" style={{ background: 'var(--app-bg)' }} />;
-  }
-
-  if (!user || needsEmailVerification) {
-    return <AuthScreen />;
-  }
+  if (loading) return <div className="min-h-screen" style={{ background: 'var(--app-bg)' }} />;
+  if (!user || needsEmailVerification) return <AuthScreen />;
 
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: 'var(--app-bg)' }}>
-      <IncomingCallModal />
+      
+      <GlobalNotifications /> {/* <--- БАННЕР УВЕДОМЛЕНИЙ */}
+      
+      <IncomingCallModal /> {/* <--- БАННЕР ВХОДЯЩЕГО ЗВОНКА */}
+      
       {outgoingCall && (
-        <OutgoingCallModal
-          peer={outgoingCall.peer}
-          callType={outgoingCall.callType}
-          chatId={outgoingCall.chatId}
-          onCancel={() => setOutgoingCall(null)}
-        />
+        <OutgoingCallModal peer={outgoingCall.peer} callType={outgoingCall.callType} chatId={outgoingCall.chatId} onCancel={() => setOutgoingCall(null)} />
       )}
+      
       <div className="max-w-3xl mx-auto h-screen flex flex-col">
         <div className="flex-1 overflow-hidden" style={{ paddingBottom: openChat || openGroup ? 0 : '5.5rem' }}>
           <AnimatePresence mode="wait">
