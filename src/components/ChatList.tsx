@@ -1,74 +1,67 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase, Profile, Group, GroupType } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLanguage } from '@/contexts/LanguageContext';
 import { BookmarkIcon, GroupIcon, ChannelIcon, PlusIcon } from '@/components/Icons';
 import StoriesBar from '@/components/StoriesBar';
 
-const AVATAR_RINGS = ['linear-gradient(135deg, #ff6b6b, #ee5a24)','linear-gradient(135deg, #4834d4, #686de0)','linear-gradient(135deg, #00d2d3, #54a0ff)','linear-gradient(135deg, #1abc9c, #2ecc71)','linear-gradient(135deg, #f39c12, #e74c3c)'];
-function ringColor(id: string) { const hash = id.split('').reduce((a, c) => a + c.charCodeAt(0), 0); return AVATAR_RINGS[hash % AVATAR_RINGS.length]; }
-
 export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: any) {
   const { user, profile } = useAuth();
-  const { lang } = useLanguage();
   const [chats, setChats] = useState<any[]>([]);
   const [savedMessagesChatId, setSavedMessagesChatId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
-
-  // Статус загрузки (текст сверху)
-  const [statusText, setStatusText] = useState(lang === 'ru' ? 'Соединение...' : 'Connecting...');
+  const [statusText, setStatusText] = useState('Соединение...');
 
   useEffect(() => {
     if (!loading) {
       setStatusText('Flux');
       return;
     }
-    setStatusText(lang === 'ru' ? 'Устанавливаем соединение...' : 'Connecting...');
-    const t1 = setTimeout(() => setStatusText(lang === 'ru' ? 'Проверяем чаты...' : 'Checking chats...'), 800);
-    return () => { clearTimeout(t1); };
-  }, [loading, lang]);
+    const t1 = setTimeout(() => setStatusText('Проверка чатов...'), 800);
+    const t2 = setTimeout(() => setStatusText('Загрузка...'), 1600);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [loading]);
 
   const loadChats = useCallback(async () => {
     if (!user) return;
+    setLoading(true);
     
-    // Загружаем личные чаты
-    const { data: myChats } = await supabase.from('chats').select('*').or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
-    
-    if (myChats && myChats.length > 0) {
-      const peerIds = myChats.map((c) => c.user1_id === user.id ? c.user2_id : c.user1_id);
-      const { data: peers } = await supabase.from('profiles').select('*').in('id', peerIds);
+    // ФИКС: try/catch/finally гарантирует, что загрузка завершится даже при ошибке сети
+    try {
+      const { data: myChats } = await supabase.from('chats').select('*').or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
       
-      const previews = myChats.map(chat => {
-        const peer = peers?.find(p => p.id === (chat.user1_id === user.id ? chat.user2_id : chat.user1_id));
-        return { ...chat, peer };
-      }).filter(c => c.peer);
-      setChats(previews);
-    } else { 
-      setChats([]); 
+      if (myChats && myChats.length > 0) {
+        const peerIds = myChats.map((c) => c.user1_id === user.id ? c.user2_id : c.user1_id);
+        const { data: peers } = await supabase.from('profiles').select('*').in('id', peerIds);
+        
+        const previews = myChats.map(chat => {
+          const peer = peers?.find(p => p.id === (chat.user1_id === user.id ? chat.user2_id : chat.user1_id));
+          return { ...chat, peer };
+        }).filter(c => c.peer);
+        setChats(previews);
+      } else { 
+        setChats([]); 
+      }
+
+      const { data: sChat } = await supabase.rpc('get_or_create_self_chat');
+      if (sChat) setSavedMessagesChatId(sChat);
+    } catch (error) {
+      console.error("Ошибка загрузки чатов:", error);
+    } finally {
+      // ФИКС: Выключаем загрузку при любом исходе
+      setLoading(false);
     }
-
-    // Загружаем Избранное
-    const { data: sChat } = await supabase.rpc('get_or_create_self_chat');
-    if (sChat) setSavedMessagesChatId(sChat);
-
-    setLoading(false);
   }, [user]);
 
   useEffect(() => { 
     loadChats(); 
-    // Слушаем новые сообщения для обновления списка
-    const channel = supabase.channel('chat_list_updates')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => loadChats())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
   }, [loadChats]);
 
   return (
     <div className="flex flex-col h-full relative" style={{ background: 'var(--app-bg)' }}>
       <div className="sticky top-0 z-20 px-5 py-4 glass-nav border-b flex justify-between items-center" style={{ borderColor: 'var(--app-border-glass)' }}>
-        <h2 className="text-[26px] font-bold tracking-tight" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Чаты' : 'Chats'}</h2>
+        <h2 className="text-[26px] font-bold tracking-tight" style={{ color: 'var(--app-text)' }}>Чаты</h2>
         <span className="text-xs font-medium px-3 py-1 rounded-full bg-white/5 border border-white/10" style={{ color: loading ? 'var(--app-accent)' : 'var(--app-text-muted)' }}>{statusText}</span>
       </div>
 
@@ -82,24 +75,22 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: any
           ) : (
             <>
               {savedMessagesChatId && (
-                <ListItem id="saved" fallbackIcon={<BookmarkIcon size={22} />} name={lang === 'ru' ? 'Избранное' : 'Saved Messages'} message={lang === 'ru' ? 'Личные заметки' : 'Personal notes'} onClick={() => onOpenChat(savedMessagesChatId, profile)} isSaved />
+                <ListItem id="saved" fallbackIcon={<BookmarkIcon size={22} />} name="Избранное" message="Личные заметки" onClick={() => onOpenChat(savedMessagesChatId, profile)} isSaved />
               )}
               {chats.map((c) => (
-                 <ListItem key={c.id} id={c.peer.id} avatarUrl={c.peer.avatar_url} fallbackText={(c.peer.display_name || '?').slice(0,2).toUpperCase()} name={c.peer.display_name || c.peer.username} message={lang === 'ru' ? 'Нажмите, чтобы открыть' : 'Tap to open'} onClick={() => onOpenChat(c.id, c.peer)} />
+                 <ListItem key={c.id} id={c.peer.id} avatarUrl={c.peer.avatar_url} fallbackText={(c.peer.display_name || '?').slice(0,2).toUpperCase()} name={c.peer.display_name || c.peer.username} message="Нажмите, чтобы открыть" onClick={() => onOpenChat(c.id, c.peer)} />
               ))}
             </>
           )}
         </div>
       </div>
       
-      {/* ПЛАВАЮЩАЯ КНОПКА "+" */}
       <div className="fixed bottom-[100px] right-5 z-30">
         <motion.button whileTap={{ scale: 0.85 }} onClick={() => setShowCreateMenu(!showCreateMenu)} className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg" style={{ background: 'var(--app-accent)', color: '#fff' }}>
           <motion.div animate={{ rotate: showCreateMenu ? 45 : 0 }}><PlusIcon size={26} /></motion.div>
         </motion.button>
       </div>
 
-      {/* МЕНЮ СОЗДАНИЯ */}
       <AnimatePresence>
         {showCreateMenu && (
           <>
@@ -107,11 +98,11 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: any
             <motion.div initial={{ opacity: 0, y: 20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.9 }} className="fixed bottom-40 right-5 z-40 rounded-3xl p-2 shadow-2xl border glass-panel" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
               <button onClick={() => { setShowCreateMenu(false); onCreateGroup('group'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors">
                 <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center"><GroupIcon size={18} style={{ color: '#54a0ff' }} /></div>
-                <span className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Новая группа' : 'New Group'}</span>
+                <span className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>Новая группа</span>
               </button>
               <button onClick={() => { setShowCreateMenu(false); onCreateGroup('channel'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors">
                 <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center"><ChannelIcon size={18} style={{ color: '#9b59b6' }} /></div>
-                <span className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Новый канал' : 'New Channel'}</span>
+                <span className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>Новый канал</span>
               </button>
             </motion.div>
           </>
@@ -122,11 +113,10 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: any
 }
 
 const ListItem = memo(function ListItem({ id, avatarUrl, fallbackIcon, fallbackText, name, message, onClick, isSaved }: any) {
-  const ring = isSaved ? 'linear-gradient(135deg, var(--app-accent), #9b59b6)' : ringColor(id);
   return (
     <motion.button whileTap={{ scale: 0.98 }} onClick={onClick} className="w-full flex items-center gap-4 px-2 py-3 rounded-2xl hover:bg-white/5 transition-colors">
       <div className="relative flex-shrink-0">
-        <div className="w-[50px] h-[50px] rounded-full p-[2px]" style={{ background: ring }}>
+        <div className="w-[50px] h-[50px] rounded-full p-[2px]" style={{ background: isSaved ? 'var(--app-accent)' : 'var(--app-border)' }}>
           {avatarUrl ? <img src={avatarUrl} className="w-full h-full rounded-full object-cover border-2" style={{ borderColor: 'var(--app-bg)' }} /> : <div className="w-full h-full rounded-full flex items-center justify-center font-semibold border-2" style={{ background: 'var(--app-surface)', color: 'var(--app-text)', borderColor: 'var(--app-bg)' }}>{fallbackIcon || fallbackText}</div>}
         </div>
       </div>
