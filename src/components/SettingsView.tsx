@@ -7,7 +7,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { themes, themeList } from '@/lib/types';
 import { 
   UserIcon, LockIcon, GlobeIcon, PaletteIcon, LogOutIcon, ChevronRightIcon, 
-  MusicIcon, BellIcon, BackIcon, UsersIcon, PlayIcon, PauseIcon 
+  MusicIcon, BellIcon, BackIcon, UsersIcon, PlayIcon, PauseIcon, VerifiedIcon 
 } from '@/components/Icons';
 
 type SubPage = 'main' | 'profile' | 'privacy' | 'appearance' | 'notifications' | 'accounts';
@@ -110,10 +110,12 @@ export default function SettingsView() {
     await refreshProfile();
   };
 
+  // ВОТ ТУТ ВСЕ 5 РАЗДЕЛОВ
   const cards = [
     { key: 'profile', icon: UserIcon, label: lang === 'ru' ? 'Профиль' : 'Profile', desc: lang === 'ru' ? 'Аватар, баннер, имя, био' : 'Avatar, banner, name, bio' },
-    { key: 'privacy', icon: LockIcon, label: lang === 'ru' ? 'Конфиденциальность' : 'Privacy', desc: lang === 'ru' ? 'Кто может писать' : 'Who can write' },
+    { key: 'accounts', icon: UsersIcon, label: lang === 'ru' ? 'Аккаунты' : 'Accounts', desc: lang === 'ru' ? 'Управление аккаунтами' : 'Manage accounts' },
     { key: 'notifications', icon: BellIcon, label: lang === 'ru' ? 'Уведомления' : 'Notifications', desc: lang === 'ru' ? 'Звуки и вибрации' : 'Sounds and vibrations' },
+    { key: 'privacy', icon: LockIcon, label: lang === 'ru' ? 'Конфиденциальность' : 'Privacy', desc: lang === 'ru' ? 'Кто может писать' : 'Who can write' },
     { key: 'appearance', icon: PaletteIcon, label: lang === 'ru' ? 'Оформление' : 'Appearance', desc: lang === 'ru' ? 'Темы и язык' : 'Themes and language' },
   ];
 
@@ -129,9 +131,16 @@ export default function SettingsView() {
             <h2 className="text-[26px] font-bold mb-4" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Настройки' : 'Settings'}</h2>
             <div className="glass-panel rounded-3xl p-5 flex items-center gap-4 mb-4 cursor-pointer" onClick={() => setSubPage('profile')}>
               {avatarUrl ? <img src={avatarUrl} className="w-16 h-16 rounded-full object-cover" /> : <div className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-xl text-white" style={{ background: 'var(--app-accent)' }}>{initials}</div>}
-              <div className="flex-1"><p className="font-bold text-lg" style={{ color: 'var(--app-text)' }}>{displayName || 'User'}</p><p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>@{profile?.username}</p></div>
+              <div className="flex-1">
+                <div className="flex items-center gap-1.5">
+                  <p className="font-bold text-lg" style={{ color: 'var(--app-text)' }}>{displayName || 'User'}</p>
+                  {(profile as any)?.is_verified && <VerifiedIcon size={18} />}
+                </div>
+                <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>@{profile?.username}</p>
+              </div>
               <ChevronRightIcon size={18} style={{ color: 'var(--app-text-muted)' }} />
             </div>
+            
             {cards.map(({ key, icon: Icon, label, desc }) => (
               <motion.button key={key} whileTap={{ scale: 0.98 }} onClick={() => setSubPage(key as SubPage)} className="glass-panel rounded-2xl w-full p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-500 text-white"><Icon size={20} /></div>
@@ -161,7 +170,10 @@ export default function SettingsView() {
               </div>
               <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(e) => handleUpload(e, 'avatar')} />
 
-              <h2 className="text-2xl font-bold mt-3" style={{ color: 'var(--app-text)' }}>{displayName}</h2>
+              <div className="flex items-center gap-1.5 mt-3">
+                <h2 className="text-2xl font-bold" style={{ color: 'var(--app-text)' }}>{displayName}</h2>
+                {(profile as any)?.is_verified && <VerifiedIcon size={24} />}
+              </div>
               <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>@{profile?.username}</p>
               
               <div className="w-full px-4 mt-4 text-center">
@@ -201,6 +213,21 @@ export default function SettingsView() {
           </motion.div>
         )}
 
+        {/* АККАУНТЫ (ВЕРНУЛИ) */}
+        {subPage === 'accounts' && (
+           <motion.div key="accounts" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} className="p-4 pb-24">
+             <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> {lang === 'ru' ? 'Назад' : 'Back'}</button>
+             <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Аккаунты' : 'Accounts'}</h2>
+             <div className="glass-panel rounded-2xl p-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  {avatarUrl ? <img src={avatarUrl} className="w-10 h-10 rounded-full object-cover" /> : <div className="w-10 h-10 rounded-full bg-blue-500" />}
+                  <span style={{ color: 'var(--app-text)' }}>@{profile?.username}</span>
+                </div>
+                <span className="text-green-500 text-sm font-medium">{lang === 'ru' ? 'Активный' : 'Active'}</span>
+             </div>
+           </motion.div>
+        )}
+
         {/* ПРИВАТНОСТЬ (РАБОЧАЯ) */}
         {subPage === 'privacy' && (
           <motion.div key="privacy" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} className="p-4 pb-24">
@@ -210,21 +237,18 @@ export default function SettingsView() {
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="font-medium" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Кто может писать' : 'Who can message'}</p>
-                    <p className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{lang === 'ru' ? 'Разрешить сообщения' : 'Allow messages'}</p>
                   </div>
                   <Toggle value={allowMessages} onChange={() => { setAllowMessages(!allowMessages); updateSetting({ allow_messages: !allowMessages }); }} />
                 </div>
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="font-medium" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Кто может звонить' : 'Who can call'}</p>
-                    <p className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{lang === 'ru' ? 'Разрешить звонки' : 'Allow calls'}</p>
                   </div>
                   <Toggle value={allowCalls} onChange={() => { setAllowCalls(!allowCalls); updateSetting({ allow_calls: !allowCalls }); }} />
                 </div>
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="font-medium" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Режим призрака' : 'Ghost mode'}</p>
-                    <p className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{lang === 'ru' ? 'Скрывать статус "В сети"' : 'Hide online status'}</p>
                   </div>
                   <Toggle value={ghostMode} onChange={() => { setGhostMode(!ghostMode); updateSetting({ ghost_mode: !ghostMode }); }} />
                 </div>
@@ -241,7 +265,6 @@ export default function SettingsView() {
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="font-medium" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Звук' : 'Sound'}</p>
-                    <p className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{lang === 'ru' ? 'Звук новых сообщений' : 'New message sound'}</p>
                   </div>
                   <Toggle value={notifSound} onChange={() => { setNotifSound(!notifSound); updateSetting({ notif_sound: !notifSound }); }} />
                 </div>
