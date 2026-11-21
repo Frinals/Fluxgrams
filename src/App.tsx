@@ -15,6 +15,12 @@ import IncomingCallModal from '@/components/IncomingCallModal';
 import OutgoingCallModal from '@/components/OutgoingCallModal';
 import { CreateGroupModal } from '@/components/CreateGroupModal';
 
+interface OutgoingCallState {
+  peer: Profile;
+  callType: 'audio' | 'video';
+  chatId: string | null;
+}
+
 const springTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
 function GlobalManager() {
@@ -23,14 +29,12 @@ function GlobalManager() {
   const [banner, setBanner] = useState<{ type: 'msg' | 'call', text: string } | null>(null);
 
   useEffect(() => {
-    // Проверка режима обслуживания
     const checkMaintenance = async () => {
       const { data } = await supabase.from('app_settings').select('is_maintenance').eq('id', 1).single();
       if (data?.is_maintenance) setIsMaintenance(true);
     };
     checkMaintenance();
 
-    // Слушаем изменения рубильника
     const settingsSub = supabase.channel('settings').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_settings' }, (payload) => {
       setIsMaintenance(payload.new.is_maintenance);
     }).subscribe();
@@ -41,7 +45,6 @@ function GlobalManager() {
   useEffect(() => {
     if (!user) return;
 
-    // Слушаем новые сообщения и звонки для баннеров
     const notifSub = supabase.channel('global_banners')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         if (payload.new && payload.new.sender_id !== user.id) {
@@ -62,7 +65,7 @@ function GlobalManager() {
 
   if (isMaintenance) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center" style={{ background: 'var(--app-bg)' }}>
+      <div className="fixed inset-0 z-[99999] flex flex-col items-center justify-center p-8 text-center" style={{ background: 'var(--app-bg)' }}>
         <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mb-6">
            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
         </div>
@@ -97,7 +100,7 @@ function MessengerApp() {
   const [activeTab, setActiveTab] = useState<Tab>('chats');
   const [openChat, setOpenChat] = useState<{ chatId: string; peer: Profile } | null>(null);
   const [openGroup, setOpenGroup] = useState<Group | null>(null);
-  const [outgoingCall, setOutgoingCall] = useState<any | null>(null);
+  const [outgoingCall, setOutgoingCall] = useState<OutgoingCallState | null>(null);
   const [createModalType, setCreateModalType] = useState<GroupType | null>(null);
 
   const handleCall = async (peer: Profile, callType: 'audio' | 'video') => {
@@ -111,35 +114,36 @@ function MessengerApp() {
   if (!user || needsEmailVerification) return <AuthScreen />;
 
   return (
-    <div className="min-h-screen relative overflow-hidden" style={{ background: 'var(--app-bg)' }}>
-      <GlobalManager />
+    <div className="h-screen flex flex-col relative overflow-hidden" style={{ background: 'var(--app-bg)' }}>
       
-      {outgoingCall && <OutgoingCallModal peer={outgoingCall.peer} callType={outgoingCall.callType} chatId={outgoingCall.chatId} onCancel={() => setOutgoingCall(null)} />}
-      
-      <div className="max-w-3xl mx-auto h-screen flex flex-col">
-        <div className="flex-1 overflow-hidden" style={{ paddingBottom: openChat || openGroup ? 0 : '5.5rem' }}>
-          <AnimatePresence mode="wait">
-            {openChat ? (
-              <motion.div key="chat" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={springTransition} className="h-full">
-                <ChatView chatId={openChat.chatId} peer={openChat.peer} group={null} onBack={() => setOpenChat(null)} onCall={handleCall} />
-              </motion.div>
-            ) : openGroup ? (
-              <motion.div key="group" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={springTransition} className="h-full">
-                <ChatView chatId={null} peer={{} as Profile} group={openGroup} onBack={() => setOpenGroup(null)} onCall={handleCall} />
-              </motion.div>
-            ) : (
-              <motion.div key="tabs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={springTransition} className="h-full">
-                {activeTab === 'chats' && <ChatList onOpenChat={(chatId, peer) => setOpenChat({ chatId, peer })} onOpenGroup={(g) => setOpenGroup(g)} onCreateGroup={setCreateModalType} />}
-                {activeTab === 'search' && <SearchView onOpenChat={(chatId, peer) => setOpenChat({ chatId, peer })} onOpenGroup={(g) => setOpenGroup(g)} />}
-                {activeTab === 'calls' && <CallsView />}
-                {activeTab === 'settings' && <SettingsView />}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+      <div className="flex-1 overflow-hidden relative">
+        <AnimatePresence mode="wait">
+          {openChat ? (
+            <motion.div key="chat" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={springTransition} className="h-full absolute inset-0">
+              <ChatView chatId={openChat.chatId} peer={openChat.peer} group={null} onBack={() => setOpenChat(null)} onCall={handleCall} />
+            </motion.div>
+          ) : openGroup ? (
+            <motion.div key="group" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={springTransition} className="h-full absolute inset-0">
+              <ChatView chatId={null} peer={{} as Profile} group={openGroup} onBack={() => setOpenGroup(null)} onCall={handleCall} />
+            </motion.div>
+          ) : (
+            <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="h-full absolute inset-0">
+              {activeTab === 'chats' && <ChatList onOpenChat={(chatId, peer) => setOpenChat({ chatId, peer })} onOpenGroup={(g) => setOpenGroup(g)} onCreateGroup={setCreateModalType} />}
+              {activeTab === 'search' && <SearchView onOpenChat={(chatId, peer) => setOpenChat({ chatId, peer })} onOpenGroup={(g) => setOpenGroup(g)} />}
+              {activeTab === 'calls' && <CallsView />}
+              {activeTab === 'settings' && <SettingsView />}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-      {!openChat && !openGroup && <BottomNav active={activeTab} onChange={setActiveTab} />}
-      
+
+      {/* НИЖНЯЯ ПАНЕЛЬ - ТЕПЕРЬ ВСЕГДА СНИЗУ И НЕ ПЕРЕКРЫВАЕТСЯ */}
+      {!openChat && !openGroup && (
+        <div className="flex-shrink-0 relative z-50">
+          <BottomNav active={activeTab} onChange={setActiveTab} />
+        </div>
+      )}
+
       <AnimatePresence>
         {createModalType && <CreateGroupModal type={createModalType} onClose={() => setCreateModalType(null)} onCreated={() => setCreateModalType(null)} />}
       </AnimatePresence>
