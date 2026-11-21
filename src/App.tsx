@@ -23,6 +23,7 @@ interface OutgoingCallState {
 
 const springTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
+// ВОТ ТУТ РУБИЛЬНИК И УВЕДОМЛЕНИЯ
 function GlobalManager() {
   const { user } = useAuth();
   const [isMaintenance, setIsMaintenance] = useState(false);
@@ -44,7 +45,6 @@ function GlobalManager() {
 
   useEffect(() => {
     if (!user) return;
-
     const notifSub = supabase.channel('global_banners')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         if (payload.new && payload.new.sender_id !== user.id) {
@@ -59,7 +59,6 @@ function GlobalManager() {
         }
       })
       .subscribe();
-
     return () => { supabase.removeChannel(notifSub); };
   }, [user]);
 
@@ -116,6 +115,9 @@ function MessengerApp() {
   return (
     <div className="h-screen flex flex-col relative overflow-hidden" style={{ background: 'var(--app-bg)' }}>
       
+      {/* ВОТ ОН, СТОРОЖ, КОТОРЫЙ ВЫКЛЮЧАЕТ САЙТ */}
+      <GlobalManager />
+
       <div className="flex-1 overflow-hidden relative">
         <AnimatePresence mode="wait">
           {openChat ? (
@@ -137,7 +139,6 @@ function MessengerApp() {
         </AnimatePresence>
       </div>
 
-      {/* НИЖНЯЯ ПАНЕЛЬ - ТЕПЕРЬ ВСЕГДА СНИЗУ И НЕ ПЕРЕКРЫВАЕТСЯ */}
       {!openChat && !openGroup && (
         <div className="flex-shrink-0 relative z-50">
           <BottomNav active={activeTab} onChange={setActiveTab} />
