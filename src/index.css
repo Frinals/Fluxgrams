@@ -73,3 +73,33 @@ body {
 .liquid-orb {
   display: none !important;
 }
+/* --- КАСТОМНЫЕ ШРИФТЫ ДЛЯ НИКНЕЙМОВ --- */
+.font-default { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+.font-serif { font-family: 'Georgia', serif; font-style: italic; }
+.font-mono { font-family: 'Courier New', monospace; letter-spacing: -1px; }
+.font-bold-caps { text-transform: uppercase; letter-spacing: 2px; }
+
+/* --- КАСТОМНЫЕ РАМКИ ДЛЯ АВАТАРОК --- */
+.frame-default { border-color: var(--app-bg); }
+
+/* Золотая рамка */
+.frame-gold {
+  border: 4px solid transparent !important;
+  background: linear-gradient(var(--app-bg), var(--app-bg)) padding-box,
+              linear-gradient(45deg, #FFD700, #FFA500, #FFD700) border-box;
+}
+
+/* Неоновая рамка */
+.frame-neon {
+  border: 4px solid transparent !important;
+  background: linear-gradient(var(--app-bg), var(--app-bg)) padding-box,
+              linear-gradient(45deg, #00f2fe, #4facfe, #00f2fe) border-box;
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.6);
+}
+
+/* Огненная рамка */
+.frame-fire {
+  border: 4px solid transparent !important;
+  background: linear-gradient(var(--app-bg), var(--app-bg)) padding-box,
+              linear-gradient(45deg, #f12711, #f5af19, #f12711) border-box;
+}
