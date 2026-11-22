@@ -44,6 +44,9 @@ export default function SettingsView() {
   const [ghostMode, setGhostMode] = useState(false);
   const [notifSound, setNotifSound] = useState(true);
 
+  // Стейт для постов
+  const [newPost, setNewPost] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const songInputRef = useRef<HTMLInputElement>(null);
@@ -59,7 +62,6 @@ export default function SettingsView() {
       setSongTitle(profile.song_title || '');
       setSongArtist(profile.song_artist || '');
       
-      // Загружаем настройки
       setAllowMessages((profile as any).allow_messages ?? true);
       setAllowCalls((profile as any).allow_calls ?? true);
       setGhostMode((profile as any).ghost_mode ?? false);
@@ -110,9 +112,15 @@ export default function SettingsView() {
     await refreshProfile();
   };
 
-  // ВОТ ТУТ ВСЕ 5 РАЗДЕЛОВ
+  const handleCreatePost = async () => {
+    if (!newPost.trim() || !user) return;
+    await supabase.from('user_posts').insert({ user_id: user.id, content: newPost.trim() });
+    setNewPost('');
+    alert('Пост опубликован!');
+  };
+
   const cards = [
-    { key: 'profile', icon: UserIcon, label: lang === 'ru' ? 'Профиль' : 'Profile', desc: lang === 'ru' ? 'Аватар, баннер, имя, био' : 'Avatar, banner, name, bio' },
+    { key: 'profile', icon: UserIcon, label: lang === 'ru' ? 'Профиль' : 'Profile', desc: lang === 'ru' ? 'Аватар, баннер, посты' : 'Avatar, banner, posts' },
     { key: 'accounts', icon: UsersIcon, label: lang === 'ru' ? 'Аккаунты' : 'Accounts', desc: lang === 'ru' ? 'Управление аккаунтами' : 'Manage accounts' },
     { key: 'notifications', icon: BellIcon, label: lang === 'ru' ? 'Уведомления' : 'Notifications', desc: lang === 'ru' ? 'Звуки и вибрации' : 'Sounds and vibrations' },
     { key: 'privacy', icon: LockIcon, label: lang === 'ru' ? 'Конфиденциальность' : 'Privacy', desc: lang === 'ru' ? 'Кто может писать' : 'Who can write' },
@@ -151,7 +159,7 @@ export default function SettingsView() {
           </motion.div>
         )}
 
-        {/* КРАСИВЫЙ ПРОФИЛЬ */}
+        {/* КРАСИВЫЙ ПРОФИЛЬ + ПОСТЫ + СТИЛИ */}
         {subPage === 'profile' && (
           <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full overflow-y-auto pb-24">
             <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-center">
@@ -192,6 +200,50 @@ export default function SettingsView() {
                 )}
                 <input ref={songInputRef} type="file" accept="audio/*" hidden onChange={(e) => handleUpload(e, 'song')} />
               </div>
+
+              {/* БЛОК СОЗДАНИЯ ПОСТА */}
+              <div className="w-full px-4 mt-6">
+                <div className="glass-panel p-4 rounded-2xl">
+                  <h3 className="font-bold mb-2" style={{ color: 'var(--app-text)' }}>Новый пост</h3>
+                  <textarea 
+                    value={newPost} 
+                    onChange={(e) => setNewPost(e.target.value)} 
+                    placeholder="Что у вас нового?" 
+                    className="w-full p-3 rounded-xl border bg-transparent mb-2" 
+                    style={{ borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+                  />
+                  <button onClick={handleCreatePost} className="w-full py-2 bg-blue-500 text-white rounded-xl">Опубликовать</button>
+                </div>
+              </div>
+
+              {/* БЛОК КАСТОМИЗАЦИИ */}
+              <div className="w-full px-4 mt-6">
+                <div className="glass-panel p-5 rounded-2xl">
+                  <h3 className="font-semibold mb-3" style={{ color: 'var(--app-text)' }}>Стиль никнейма</h3>
+                  <select 
+                    value={(profile as any)?.font_style || 'default'} 
+                    onChange={(e) => updateSetting({ font_style: e.target.value })}
+                    className="w-full p-2 rounded-xl border bg-transparent text-white mb-4"
+                  >
+                    <option value="default">Обычный</option>
+                    <option value="serif">Курсив (Serif)</option>
+                    <option value="mono">Моноширинный</option>
+                    <option value="bold-caps">Капс (Bold)</option>
+                  </select>
+
+                  <h3 className="font-semibold mb-3" style={{ color: 'var(--app-text)' }}>Рамка аватарки</h3>
+                  <select 
+                    value={(profile as any)?.avatar_frame || 'default'} 
+                    onChange={(e) => updateSetting({ avatar_frame: e.target.value })}
+                    className="w-full p-2 rounded-xl border bg-transparent text-white"
+                  >
+                    <option value="default">Обычная</option>
+                    <option value="gold">Золотая</option>
+                    <option value="neon">Неоновая</option>
+                    <option value="fire">Огненная</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
             {editMode === 'editAll' && (
@@ -213,7 +265,7 @@ export default function SettingsView() {
           </motion.div>
         )}
 
-        {/* АККАУНТЫ (ВЕРНУЛИ) */}
+        {/* ОСТАЛЬНЫЕ РАЗДЕЛЫ НАСТРОЕК */}
         {subPage === 'accounts' && (
            <motion.div key="accounts" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} className="p-4 pb-24">
              <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> {lang === 'ru' ? 'Назад' : 'Back'}</button>
@@ -228,51 +280,40 @@ export default function SettingsView() {
            </motion.div>
         )}
 
-        {/* ПРИВАТНОСТЬ (РАБОЧАЯ) */}
         {subPage === 'privacy' && (
           <motion.div key="privacy" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} className="p-4 pb-24">
              <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> {lang === 'ru' ? 'Назад' : 'Back'}</button>
              <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Конфиденциальность' : 'Privacy'}</h2>
              <div className="glass-panel p-5 rounded-2xl space-y-6">
                 <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Кто может писать' : 'Who can message'}</p>
-                  </div>
+                  <div><p className="font-medium" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Кто может писать' : 'Who can message'}</p></div>
                   <Toggle value={allowMessages} onChange={() => { setAllowMessages(!allowMessages); updateSetting({ allow_messages: !allowMessages }); }} />
                 </div>
                 <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Кто может звонить' : 'Who can call'}</p>
-                  </div>
+                  <div><p className="font-medium" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Кто может звонить' : 'Who can call'}</p></div>
                   <Toggle value={allowCalls} onChange={() => { setAllowCalls(!allowCalls); updateSetting({ allow_calls: !allowCalls }); }} />
                 </div>
                 <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Режим призрака' : 'Ghost mode'}</p>
-                  </div>
+                  <div><p className="font-medium" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Режим призрака' : 'Ghost mode'}</p></div>
                   <Toggle value={ghostMode} onChange={() => { setGhostMode(!ghostMode); updateSetting({ ghost_mode: !ghostMode }); }} />
                 </div>
              </div>
           </motion.div>
         )}
 
-        {/* УВЕДОМЛЕНИЯ (РАБОЧИЕ) */}
         {subPage === 'notifications' && (
           <motion.div key="notifications" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} className="p-4 pb-24">
              <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> {lang === 'ru' ? 'Назад' : 'Back'}</button>
              <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Уведомления' : 'Notifications'}</h2>
              <div className="glass-panel p-5 rounded-2xl space-y-6">
                 <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Звук' : 'Sound'}</p>
-                  </div>
+                  <div><p className="font-medium" style={{ color: 'var(--app-text)' }}>{lang === 'ru' ? 'Звук' : 'Sound'}</p></div>
                   <Toggle value={notifSound} onChange={() => { setNotifSound(!notifSound); updateSetting({ notif_sound: !notifSound }); }} />
                 </div>
              </div>
           </motion.div>
         )}
 
-        {/* ОФОРМЛЕНИЕ И ЯЗЫК */}
         {subPage === 'appearance' && (
           <motion.div key="appearance" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 pb-24">
             <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> {lang === 'ru' ? 'Назад' : 'Back'}</button>
