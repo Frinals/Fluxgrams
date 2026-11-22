@@ -14,6 +14,7 @@ import SettingsView from '@/components/SettingsView';
 import IncomingCallModal from '@/components/IncomingCallModal';
 import OutgoingCallModal from '@/components/OutgoingCallModal';
 import { CreateGroupModal } from '@/components/CreateGroupModal';
+import UserProfileModal from '@/components/UserProfileModal'; // <--- ВАЖНО
 
 interface OutgoingCallState {
   peer: Profile;
@@ -23,7 +24,6 @@ interface OutgoingCallState {
 
 const springTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
-// ВОТ ТУТ РУБИЛЬНИК И УВЕДОМЛЕНИЯ
 function GlobalManager() {
   const { user } = useAuth();
   const [isMaintenance, setIsMaintenance] = useState(false);
@@ -101,6 +101,7 @@ function MessengerApp() {
   const [openGroup, setOpenGroup] = useState<Group | null>(null);
   const [outgoingCall, setOutgoingCall] = useState<OutgoingCallState | null>(null);
   const [createModalType, setCreateModalType] = useState<GroupType | null>(null);
+  const [viewingProfileId, setViewingProfileId] = useState<string | null>(null); // Стейт для профиля из поиска
 
   const handleCall = async (peer: Profile, callType: 'audio' | 'video') => {
     if (!user) return;
@@ -109,13 +110,20 @@ function MessengerApp() {
     setOutgoingCall({ peer, callType, chatId });
   };
 
+  const handleStartChatFromProfile = async (peer: Profile) => {
+    if (!user) return;
+    const { data: chatId } = await supabase.rpc('create_chat_with_participants', { peer_id: peer.id });
+    if (chatId) {
+      setViewingProfileId(null); // Закрываем профиль
+      setOpenChat({ chatId, peer }); // Открываем чат
+    }
+  };
+
   if (loading) return <div className="min-h-screen" style={{ background: 'var(--app-bg)' }} />;
   if (!user || needsEmailVerification) return <AuthScreen />;
 
   return (
     <div className="h-screen flex flex-col relative overflow-hidden" style={{ background: 'var(--app-bg)' }}>
-      
-      {/* ВОТ ОН, СТОРОЖ, КОТОРЫЙ ВЫКЛЮЧАЕТ САЙТ */}
       <GlobalManager />
 
       <div className="flex-1 overflow-hidden relative">
@@ -131,7 +139,7 @@ function MessengerApp() {
           ) : (
             <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="h-full absolute inset-0">
               {activeTab === 'chats' && <ChatList onOpenChat={(chatId, peer) => setOpenChat({ chatId, peer })} onOpenGroup={(g) => setOpenGroup(g)} onCreateGroup={setCreateModalType} />}
-              {activeTab === 'search' && <SearchView onOpenChat={(chatId, peer) => setOpenChat({ chatId, peer })} onOpenGroup={(g) => setOpenGroup(g)} />}
+              {activeTab === 'search' && <SearchView onOpenChat={(chatId, peer) => setOpenChat({ chatId, peer })} onOpenGroup={(g) => setOpenGroup(g)} onViewProfile={(p) => setViewingProfileId(p.id)} />}
               {activeTab === 'calls' && <CallsView />}
               {activeTab === 'settings' && <SettingsView />}
             </motion.div>
@@ -147,6 +155,18 @@ function MessengerApp() {
 
       <AnimatePresence>
         {createModalType && <CreateGroupModal type={createModalType} onClose={() => setCreateModalType(null)} onCreated={() => setCreateModalType(null)} />}
+      </AnimatePresence>
+
+      {/* МОДАЛКА ПРОФИЛЯ ИЗ ПОИСКА */}
+      <AnimatePresence>
+        {viewingProfileId && (
+          <UserProfileModal 
+            profileId={viewingProfileId} 
+            onClose={() => setViewingProfileId(null)} 
+            onStartChat={handleStartChatFromProfile}
+            onCall={(peer, type) => { setViewingProfileId(null); handleCall(peer, type); }}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
