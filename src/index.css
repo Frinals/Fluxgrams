@@ -103,3 +103,33 @@ body {
   background: linear-gradient(var(--app-bg), var(--app-bg)) padding-box,
               linear-gradient(45deg, #f12711, #f5af19, #f12711) border-box;
 }
+/* --- ШРИФТЫ --- */
+.font-default { font-family: inherit; }
+.font-bold-caps { text-transform: uppercase; font-weight: 900; letter-spacing: 2px; }
+.font-serif { font-family: 'Georgia', serif; font-style: italic; }
+.font-mono { font-family: 'Courier New', monospace; font-weight: bold; }
+
+/* --- РАМКИ --- */
+/* Золотая */
+.frame-gold {
+  border: 3px solid #FFD700 !important;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+}
+
+/* Неоновая */
+.frame-neon {
+  border: 3px solid #00f2fe !important;
+  box-shadow: 0 0 20px #00f2fe, 0 0 10px #4facfe inset;
+}
+
+/* Огненная (выходит за края) */
+.frame-fire {
+  border: 3px solid #f12711 !important;
+  box-shadow: 0 0 15px #f12711, 0 0 30px #f5af19, 0 0 45px #f12711;
+  animation: firePulse 2s infinite alternate;
+}
+
+@keyframes firePulse {
+  0% { box-shadow: 0 0 15px #f12711, 0 0 25px #f5af19; }
+  100% { box-shadow: 0 0 25px #f12711, 0 0 45px #f5af19; }
+}
