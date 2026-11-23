@@ -1,355 +1,194 @@
-import { useState, FormEvent, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '@/contexts/AuthContext';
-import { useLanguage } from '@/contexts/LanguageContext';
-
-const springTransition = { type: 'spring' as const, stiffness: 300, damping: 30 };
+import { supabase } from '@/lib/supabase';
 
 export default function AuthScreen() {
-  const { signIn, signUp, verifyOtp, resendOtp, needsEmailVerification, user } = useAuth();
-  const { t } = useLanguage();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signup');
+  const [step, setStep] = useState(0); // 0, 1, 2 - онбординг. 3 - регистрация
+  const [isLogin, setIsLogin] = useState(false);
+  
+  // Стейты для формы
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // OTP state
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [otpError, setOtpError] = useState<string | null>(null);
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  const pendingEmail = user?.email || email;
-
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [resendCooldown]);
-
-  const handleSubmit = async (e: FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setError(null);
 
-    if (mode === 'signup') {
-      if (!username.trim() || !displayName.trim()) {
-        setError('Please enter a username and display name.');
-        return;
+    try {
+      if (isLogin) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        alert('Успешная регистрация! Теперь вы можете войти.');
+        setIsLogin(true);
       }
-    }
-
-    setLoading(true);
-
-    const result = mode === 'signin'
-      ? await signIn(email, password)
-      : await signUp(email, password, username, displayName);
-
-    if (result.error) {
-      setError(result.error);
+    } catch (err: any) {
+      setError(err.message || 'Произошла ошибка');
+    } finally {
       setLoading(false);
     }
-    // If needsVerification is true, the needsEmailVerification state will flip
-    // and the OTP screen will show automatically
   };
 
-  const handleOtpChange = (index: number, value: string) => {
-    if (!/^\d?$/.test(value)) return;
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-    setOtpError(null);
-
-    if (value && index < 5) {
-      otpRefs.current[index + 1]?.focus();
+  // Данные для экранов онбординга
+  const slides = [
+    {
+      title: "Flux",
+      subtitle: "Мессенджер нового поколения",
+      desc: "Быстрый, красивый и безопасный. Общайся с теми, кто тебе важен.",
+      emoji: "💬",
+      color: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+    },
+    {
+      title: "Шифрование",
+      subtitle: "Твои данные в безопасности",
+      desc: "Все сообщения защищены сквозным шифрованием. Никто, кроме вас двоих, не прочитает их.",
+      emoji: "🛡️",
+      color: "linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)"
+    },
+    {
+      title: "Юзернеймы",
+      subtitle: "Найди любого за секунду",
+      desc: "Создай свой уникальный @никнейм. По нему друзья смогут найти тебя в поиске.",
+      emoji: "🔍",
+      color: "linear-gradient(135deg, #f39c12 0%, #d35400 100%)"
     }
-  };
+  ];
 
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      otpRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleOtpPaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (pasted.length > 0) {
-      const newOtp = pasted.split('');
-      while (newOtp.length < 6) newOtp.push('');
-      setOtp(newOtp);
-      otpRefs.current[Math.min(pasted.length, 5)]?.focus();
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    const code = otp.join('');
-    if (code.length !== 6) {
-      setOtpError(t('invalidCode'));
-      return;
-    }
-    setOtpLoading(true);
-    setOtpError(null);
-    const { error } = await verifyOtp(pendingEmail, code);
-    if (error) {
-      setOtpError(error);
-      setOtpLoading(false);
-    }
-  };
-
-  const handleResend = async () => {
-    if (resendCooldown > 0) return;
-    const { error } = await resendOtp(pendingEmail);
-    if (!error) {
-      setResendCooldown(30);
-      setOtp(['', '', '', '', '', '']);
-      setOtpError(null);
-      otpRefs.current[0]?.focus();
-    }
-  };
-
-  const inputStyle = {
-    background: 'var(--app-surface)',
-    borderColor: 'var(--app-border)',
-    color: 'var(--app-text)',
-  };
-
-  // ─── OTP Verification Screen ───
-  if (needsEmailVerification) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
-           style={{ background: 'var(--app-bg-gradient)' }}>
-        <div className="absolute w-[500px] h-[500px] rounded-full opacity-30 blur-[120px] animate-pulse"
-             style={{ background: 'var(--app-accent)', top: '-15%', left: '-10%' }} />
-        <div className="absolute w-[400px] h-[400px] rounded-full opacity-20 blur-[100px] animate-pulse"
-             style={{ background: 'var(--app-glow)', bottom: '-10%', right: '-5%', animationDelay: '1.5s' }} />
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={springTransition}
-          className="relative z-10 w-full max-w-md"
-        >
-          <div className="text-center mb-8">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ ...springTransition, delay: 0.1 }}
-              className="inline-flex items-center justify-center w-20 h-20 rounded-3xl mb-4 backdrop-blur-2xl border shadow-lg"
-              style={{ background: 'var(--app-glass)', borderColor: 'var(--app-border-glass)' }}
-            >
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--app-accent)' }}>
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            </motion.div>
-            <h1 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--app-text)' }}>
-              {t('verifyEmail')}
-            </h1>
-            <p className="mt-3 text-sm" style={{ color: 'var(--app-text-muted)' }}>
-              {t('otpSent')}
-            </p>
-            <p className="mt-1 text-sm font-medium" style={{ color: 'var(--app-accent)' }}>
-              {pendingEmail}
-            </p>
-          </div>
-
-          <div className="rounded-3xl p-8 backdrop-blur-2xl border shadow-2xl"
-               style={{ background: 'var(--app-glass)', borderColor: 'var(--app-border-glass)' }}>
-            <div className="flex justify-center gap-2 mb-6" onPaste={handleOtpPaste}>
-              {otp.map((digit, i) => (
-                <input
-                  key={i}
-                  ref={(el) => { otpRefs.current[i] = el; }}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(e) => handleOtpChange(i, e.target.value)}
-                  onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                  className="w-12 h-14 text-center text-2xl font-bold rounded-xl outline-none transition-all border backdrop-blur-sm"
-                  style={{
-                    ...inputStyle,
-                    borderColor: digit ? 'var(--app-accent)' : 'var(--app-border)',
-                    boxShadow: digit ? '0 0 12px var(--app-glow)' : 'none',
-                  }}
-                />
-              ))}
-            </div>
-
-            {otpError && (
-              <div className="text-sm rounded-xl p-3 border mb-4 text-center" style={{
-                background: 'rgba(239,68,68,0.1)',
-                borderColor: 'rgba(239,68,68,0.3)',
-                color: '#ef4444',
-              }}>
-                {otpError}
-              </div>
-            )}
-
-            <button
-              onClick={handleVerifyOtp}
-              disabled={otpLoading}
-              className="w-full py-3 rounded-xl font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
-              style={{ background: 'var(--app-accent)', color: '#fff' }}
-            >
-              {otpLoading ? '...' : t('verify')}
-            </button>
-
-            <div className="mt-4 text-center">
-              <button
-                onClick={handleResend}
-                disabled={resendCooldown > 0}
-                className="text-sm hover:underline transition-all disabled:opacity-50"
-                style={{ color: 'var(--app-text-muted)' }}
-              >
-                {resendCooldown > 0 ? `${t('resendCode')} (${resendCooldown}s)` : t('resendCode')}
-              </button>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // ─── Sign In / Sign Up Screen ───
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
-         style={{ background: 'var(--app-bg-gradient)' }}>
-      <div className="absolute w-[500px] h-[500px] rounded-full opacity-30 blur-[120px] animate-pulse"
-           style={{ background: 'var(--app-accent)', top: '-15%', left: '-10%' }} />
-      <div className="absolute w-[400px] h-[400px] rounded-full opacity-20 blur-[100px] animate-pulse"
-           style={{ background: 'var(--app-glow)', bottom: '-10%', right: '-5%', animationDelay: '1.5s' }} />
-      <div className="absolute w-[300px] h-[300px] rounded-full opacity-15 blur-[80px] animate-pulse"
-           style={{ background: 'var(--app-accent)', top: '40%', right: '20%', animationDelay: '0.8s' }} />
+    <div className="min-h-screen w-full flex flex-col items-center justify-center relative overflow-hidden" style={{ background: 'var(--app-bg)' }}>
+      
+      {/* Анимированный фон */}
+      <div className="absolute inset-0 pointer-events-none transition-all duration-1000" 
+           style={{ background: step < 3 ? slides[step].color : 'var(--app-accent)', opacity: 0.15 }} />
 
-      <div className="relative z-10 w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl mb-4 backdrop-blur-2xl border shadow-lg"
-               style={{ background: 'var(--app-glass)', borderColor: 'var(--app-border-glass)' }}>
-            <span className="text-3xl font-bold" style={{ color: 'var(--app-accent)' }}>F</span>
-          </div>
-          <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--app-text)' }}>
-            Fluxgram
-          </h1>
-          <p className="mt-2 text-sm" style={{ color: 'var(--app-text-muted)' }}>
-            {mode === 'signin' ? t('welcome') : t('createAccount')}
-          </p>
-        </div>
+      <div className="w-full max-w-md p-6 relative z-10">
+        
+        <AnimatePresence mode="wait">
+          
+          {/* ЭКРАНЫ ОНБОРДИНГА */}
+          {step < 3 && (
+            <motion.div
+              key={`slide-${step}`}
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="flex flex-col items-center text-center"
+            >
+              <div className="w-32 h-32 rounded-[40px] flex items-center justify-center text-6xl shadow-2xl mb-8 glass-panel"
+                   style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
+                {slides[step].emoji}
+              </div>
+              
+              <h1 className="text-4xl font-extrabold mb-2 tracking-tight" style={{ color: 'var(--app-text)' }}>
+                {slides[step].title}
+              </h1>
+              <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--app-accent)' }}>
+                {slides[step].subtitle}
+              </h2>
+              <p className="text-base leading-relaxed mb-12" style={{ color: 'var(--app-text-muted)' }}>
+                {slides[step].desc}
+              </p>
 
-        <div className="rounded-3xl p-8 backdrop-blur-2xl border shadow-2xl"
-             style={{ background: 'var(--app-glass)', borderColor: 'var(--app-border-glass)' }}>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'signup' && (
-              <>
+              <div className="w-full flex gap-4">
+                <button 
+                  onClick={() => setStep(3)} 
+                  className="flex-1 py-4 rounded-2xl font-bold text-lg transition-transform active:scale-95"
+                  style={{ background: 'var(--app-surface)', color: 'var(--app-text)' }}
+                >
+                  Пропустить
+                </button>
+                <button 
+                  onClick={() => setStep(step + 1)} 
+                  className="flex-[2] py-4 rounded-2xl font-bold text-lg text-white transition-transform active:scale-95 shadow-lg"
+                  style={{ background: 'var(--app-accent)' }}
+                >
+                  Далее
+                </button>
+              </div>
+
+              {/* Точки-индикаторы */}
+              <div className="flex gap-2 mt-8">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className={`h-2 rounded-full transition-all duration-300 ${step === i ? 'w-8 bg-white' : 'w-2 bg-white/30'}`} />
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ФОРМА ВХОДА/РЕГИСТРАЦИИ */}
+          {step === 3 && (
+            <motion.div
+              key="auth-form"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="glass-panel p-8 rounded-[32px] shadow-2xl"
+            >
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold mb-2" style={{ color: 'var(--app-text)' }}>
+                  {isLogin ? 'С возвращением' : 'Создать аккаунт'}
+                </h2>
+                <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>
+                  {isLogin ? 'Войдите, чтобы продолжить общение' : 'Присоединяйтесь к Flux сегодня'}
+                </p>
+              </div>
+
+              <form onSubmit={handleAuth} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--app-text-muted)' }}>
-                    {t('displayName')}
-                  </label>
                   <input
-                    type="text"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Электронная почта"
                     required
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl outline-none transition-all border backdrop-blur-sm"
-                    style={inputStyle}
-                    placeholder="Your name"
+                    className="w-full px-5 py-4 rounded-2xl outline-none border transition-all focus:border-blue-500"
+                    style={{ background: 'var(--app-bg)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+                  />
+                </div>
+                <div>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Пароль"
+                    required
+                    className="w-full px-5 py-4 rounded-2xl outline-none border transition-all focus:border-blue-500"
+                    style={{ background: 'var(--app-bg)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--app-text-muted)' }}>
-                    {t('username')}
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--app-text-muted)' }}>@</span>
-                    <input
-                      type="text"
-                      required
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
-                      className="w-full pl-8 pr-4 py-3 rounded-xl outline-none transition-all border backdrop-blur-sm"
-                      style={inputStyle}
-                      placeholder="username"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
+                {error && <p className="text-red-500 text-sm text-center font-medium bg-red-500/10 p-3 rounded-xl">{error}</p>}
 
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--app-text-muted)' }}>
-                {t('email')}
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl outline-none transition-all border backdrop-blur-sm"
-                style={inputStyle}
-                placeholder="you@example.com"
-              />
-            </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-4 rounded-2xl font-bold text-lg text-white transition-all active:scale-95 disabled:opacity-50 mt-4 shadow-lg"
+                  style={{ background: 'var(--app-accent)' }}
+                >
+                  {loading ? 'Загрузка...' : isLogin ? 'Войти' : 'Зарегистрироваться'}
+                </button>
+              </form>
 
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--app-text-muted)' }}>
-                {t('password')}
-              </label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl outline-none transition-all border backdrop-blur-sm"
-                style={inputStyle}
-                placeholder="••••••••"
-              />
-            </div>
-
-            {error && (
-              <div className="text-sm rounded-xl p-3 border" style={{
-                background: 'rgba(239,68,68,0.1)',
-                borderColor: 'rgba(239,68,68,0.3)',
-                color: '#ef4444',
-              }}>
-                {error}
+              <div className="mt-6 text-center">
+                <button
+                  type="button"
+                  onClick={() => setIsLogin(!isLogin)}
+                  className="text-sm font-medium transition-colors hover:text-white"
+                  style={{ color: 'var(--app-text-muted)' }}
+                >
+                  {isLogin ? 'Нет аккаунта? Зарегистрироваться' : 'Уже есть аккаунт? Войти'}
+                </button>
               </div>
-            )}
+            </motion.div>
+          )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-xl font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
-              style={{
-                background: 'var(--app-accent)',
-                color: '#fff',
-              }}
-            >
-              {loading ? '...' : (mode === 'signin' ? t('signIn') : t('signUp'))}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => {
-                setMode(mode === 'signin' ? 'signup' : 'signin');
-                setError(null);
-              }}
-              className="text-sm hover:underline transition-all"
-              style={{ color: 'var(--app-text-muted)' }}
-            >
-              {mode === 'signin' ? t('noAccount') : t('haveAccount')}{' '}
-              <span className="font-semibold" style={{ color: 'var(--app-accent)' }}>
-                {mode === 'signin' ? t('signUp') : t('signIn')}
-              </span>
-            </button>
-          </div>
-        </div>
+        </AnimatePresence>
       </div>
     </div>
   );
