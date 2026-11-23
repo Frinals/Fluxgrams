@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -17,63 +17,53 @@ import { CreateGroupModal } from '@/components/CreateGroupModal';
 import UserProfileModal from '@/components/UserProfileModal';
 
 interface OutgoingCallState { peer: Profile; callType: 'audio' | 'video'; chatId: string | null; }
-const springTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
+
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
+  constructor(props: any) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) return <div style={{ padding: 20, background: 'red', color: 'white', minHeight: '100vh' }}><h1>Ошибка!</h1><p>{this.state.error?.message}</p></div>;
+    return this.props.children;
+  }
+}
 
 function GlobalManager() {
   const { user } = useAuth();
-  const [isMaintenance, setIsMaintenance] = useState(false);
-  const [localBanner, setLocalBanner] = useState<{title: string, text: string} | null>(null);
+  const [banner, setBanner] = useState<any>(null);
 
   useEffect(() => {
-    // 1. РЕГИСТРАЦИЯ SERVICE WORKER ДЛЯ УВЕДОМЛЕНИЙ
+    // РЕГИСТРАЦИЯ SERVICE WORKER ДЛЯ УВЕДОМЛЕНИЙ
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(console.error);
     }
-    
-    // 2. ЗАПРОС РАЗРЕШЕНИЯ
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
-
-    // 3. ПРОВЕРКА РУБИЛЬНИКА
-    const checkMaintenance = async () => {
-      const { data } = await supabase.from('app_settings').select('is_maintenance').eq('id', 1).single();
-      if (data?.is_maintenance) setIsMaintenance(true);
-    };
-    checkMaintenance();
   }, []);
 
   useEffect(() => {
     if (!user) return;
-    // Слушаем сообщения
     const notifSub = supabase.channel('global_banners')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         if (payload.new && payload.new.sender_id !== user.id) {
           const text = payload.new.content || 'Вложение';
-          
-          // Показываем баннер внутри приложения
-          setLocalBanner({ title: 'Новое сообщение', text });
-          setTimeout(() => setLocalBanner(null), 4000);
-
-          // Показываем уведомление на телефоне (если вкладка не активна)
+          setBanner({ title: 'Новое сообщение', text });
+          setTimeout(() => setBanner(null), 4000);
           if (document.hidden && Notification.permission === 'granted') {
-             new Notification('Новое сообщение в Fluxgram!', { body: text, icon: '/vite.svg' });
+             new Notification('Новое сообщение в Fluxgram!', { body: text });
           }
         }
-      })
-      .subscribe();
+      }).subscribe();
     return () => { supabase.removeChannel(notifSub); };
   }, [user]);
-
-  if (isMaintenance) return <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#0f1115] text-white">Технические работы</div>;
 
   return (
     <>
       <AnimatePresence>
-        {localBanner && (
+        {banner && (
           <motion.div initial={{ y: -100 }} animate={{ y: 20 }} exit={{ y: -100 }} className="fixed top-0 left-4 right-4 z-[9999] bg-[#1a1a1a] border border-white/10 p-4 rounded-2xl flex items-center gap-3 shadow-2xl">
             <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white">✉️</div>
-            <div><p className="text-white font-bold text-sm">{localBanner.title}</p><p className="text-gray-400 text-xs">{localBanner.text}</p></div>
+            <div><p className="text-white font-bold text-sm">{banner.title}</p><p className="text-gray-400 text-xs">{banner.text}</p></div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -97,7 +87,7 @@ function MessengerApp() {
     if (chatId) setOutgoingCall({ peer, callType, chatId });
   };
 
-  if (loading) return <div className="min-h-screen bg-[#0f1115]" />;
+  if (loading) return <div className="min-h-screen bg-[#0f1115] flex items-center justify-center text-white">Загрузка...</div>;
   if (!user || needsEmailVerification) return <AuthScreen />;
 
   return (
@@ -135,6 +125,8 @@ function MessengerApp() {
 
 export default function App() {
   return (
-    <ThemeProvider><LanguageProvider><AuthProvider><MessengerApp /></AuthProvider></LanguageProvider></ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider><LanguageProvider><AuthProvider><MessengerApp /></AuthProvider></LanguageProvider></ThemeProvider>
+    </ErrorBoundary>
   );
 }
