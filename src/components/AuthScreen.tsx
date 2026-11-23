@@ -3,10 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 
 export default function AuthScreen() {
-  const [step, setStep] = useState(0); // 0, 1, 2 - онбординг. 3 - регистрация
+  const [step, setStep] = useState(0); // 0, 1, 2 - онбординг. 3 - форма
   const [isLogin, setIsLogin] = useState(false);
   
-  // Стейты для формы
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,43 +33,45 @@ export default function AuthScreen() {
     }
   };
 
-  // Данные для экранов онбординга
+  // Данные для экранов знакомства
   const slides = [
     {
       title: "Flux",
       subtitle: "Мессенджер нового поколения",
       desc: "Быстрый, красивый и безопасный. Общайся с теми, кто тебе важен.",
       emoji: "💬",
-      color: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+      color: "#667eea"
     },
     {
       title: "Шифрование",
       subtitle: "Твои данные в безопасности",
-      desc: "Все сообщения защищены сквозным шифрованием. Никто, кроме вас двоих, не прочитает их.",
+      desc: "Все сообщения защищены. Никто, кроме вас двоих, не прочитает их.",
       emoji: "🛡️",
-      color: "linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)"
+      color: "#2ecc71"
     },
     {
       title: "Юзернеймы",
       subtitle: "Найди любого за секунду",
       desc: "Создай свой уникальный @никнейм. По нему друзья смогут найти тебя в поиске.",
       emoji: "🔍",
-      color: "linear-gradient(135deg, #f39c12 0%, #d35400 100%)"
+      color: "#f39c12"
     }
   ];
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center relative overflow-hidden" style={{ background: 'var(--app-bg)' }}>
+    <div className="min-h-screen w-full flex flex-col items-center justify-center relative overflow-hidden bg-[#0f1115]">
       
-      {/* Анимированный фон */}
-      <div className="absolute inset-0 pointer-events-none transition-all duration-1000" 
-           style={{ background: step < 3 ? slides[step].color : 'var(--app-accent)', opacity: 0.15 }} />
+      {/* Цветной фон, который меняется */}
+      <div 
+        className="absolute inset-0 pointer-events-none transition-all duration-1000 opacity-20" 
+        style={{ backgroundColor: step < 3 ? slides[step].color : '#ff6b6b' }} 
+      />
 
       <div className="w-full max-w-md p-6 relative z-10">
         
         <AnimatePresence mode="wait">
           
-          {/* ЭКРАНЫ ОНБОРДИНГА */}
+          {/* ЭКРАНЫ ЗНАКОМСТВА */}
           {step < 3 && (
             <motion.div
               key={`slide-${step}`}
@@ -80,33 +81,31 @@ export default function AuthScreen() {
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className="flex flex-col items-center text-center"
             >
-              <div className="w-32 h-32 rounded-[40px] flex items-center justify-center text-6xl shadow-2xl mb-8 glass-panel"
-                   style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
+              <div className="w-32 h-32 rounded-[40px] flex items-center justify-center text-6xl shadow-2xl mb-8 bg-white/10 border border-white/20">
                 {slides[step].emoji}
               </div>
               
-              <h1 className="text-4xl font-extrabold mb-2 tracking-tight" style={{ color: 'var(--app-text)' }}>
+              <h1 className="text-4xl font-extrabold mb-2 tracking-tight text-white">
                 {slides[step].title}
               </h1>
-              <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--app-accent)' }}>
+              <h2 className="text-xl font-semibold mb-4" style={{ color: slides[step].color }}>
                 {slides[step].subtitle}
               </h2>
-              <p className="text-base leading-relaxed mb-12" style={{ color: 'var(--app-text-muted)' }}>
+              <p className="text-base leading-relaxed mb-12 text-gray-400">
                 {slides[step].desc}
               </p>
 
               <div className="w-full flex gap-4">
                 <button 
                   onClick={() => setStep(3)} 
-                  className="flex-1 py-4 rounded-2xl font-bold text-lg transition-transform active:scale-95"
-                  style={{ background: 'var(--app-surface)', color: 'var(--app-text)' }}
+                  className="flex-1 py-4 rounded-2xl font-bold text-lg transition-transform active:scale-95 bg-white/10 text-white"
                 >
                   Пропустить
                 </button>
                 <button 
                   onClick={() => setStep(step + 1)} 
                   className="flex-[2] py-4 rounded-2xl font-bold text-lg text-white transition-transform active:scale-95 shadow-lg"
-                  style={{ background: 'var(--app-accent)' }}
+                  style={{ backgroundColor: slides[step].color }}
                 >
                   Далее
                 </button>
@@ -128,13 +127,13 @@ export default function AuthScreen() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-              className="glass-panel p-8 rounded-[32px] shadow-2xl"
+              className="p-8 rounded-[32px] shadow-2xl bg-white/5 border border-white/10 backdrop-blur-md"
             >
               <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold mb-2" style={{ color: 'var(--app-text)' }}>
+                <h2 className="text-3xl font-bold mb-2 text-white">
                   {isLogin ? 'С возвращением' : 'Создать аккаунт'}
                 </h2>
-                <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>
+                <p className="text-sm text-gray-400">
                   {isLogin ? 'Войдите, чтобы продолжить общение' : 'Присоединяйтесь к Flux сегодня'}
                 </p>
               </div>
@@ -147,8 +146,7 @@ export default function AuthScreen() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Электронная почта"
                     required
-                    className="w-full px-5 py-4 rounded-2xl outline-none border transition-all focus:border-blue-500"
-                    style={{ background: 'var(--app-bg)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+                    className="w-full px-5 py-4 rounded-2xl outline-none border border-white/10 bg-black/20 text-white placeholder-gray-500 focus:border-blue-500 transition-all"
                   />
                 </div>
                 <div>
@@ -158,8 +156,7 @@ export default function AuthScreen() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Пароль"
                     required
-                    className="w-full px-5 py-4 rounded-2xl outline-none border transition-all focus:border-blue-500"
-                    style={{ background: 'var(--app-bg)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+                    className="w-full px-5 py-4 rounded-2xl outline-none border border-white/10 bg-black/20 text-white placeholder-gray-500 focus:border-blue-500 transition-all"
                   />
                 </div>
 
@@ -168,8 +165,7 @@ export default function AuthScreen() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-4 rounded-2xl font-bold text-lg text-white transition-all active:scale-95 disabled:opacity-50 mt-4 shadow-lg"
-                  style={{ background: 'var(--app-accent)' }}
+                  className="w-full py-4 rounded-2xl font-bold text-lg text-white transition-all active:scale-95 disabled:opacity-50 mt-4 shadow-lg bg-blue-500 hover:bg-blue-600"
                 >
                   {loading ? 'Загрузка...' : isLogin ? 'Войти' : 'Зарегистрироваться'}
                 </button>
@@ -179,8 +175,7 @@ export default function AuthScreen() {
                 <button
                   type="button"
                   onClick={() => setIsLogin(!isLogin)}
-                  className="text-sm font-medium transition-colors hover:text-white"
-                  style={{ color: 'var(--app-text-muted)' }}
+                  className="text-sm font-medium text-gray-400 hover:text-white transition-colors"
                 >
                   {isLogin ? 'Нет аккаунта? Зарегистрироваться' : 'Уже есть аккаунт? Войти'}
                 </button>
