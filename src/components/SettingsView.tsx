@@ -10,7 +10,7 @@ import { UserIcon, LockIcon, GlobeIcon, PaletteIcon, LogOutIcon, ChevronRightIco
 type SubPage = 'main' | 'profile' | 'privacy' | 'appearance' | 'notifications' | 'accounts' | 'currency';
 
 export default function SettingsView({ onViewProfile }: any) {
-  const { user, profile, signOut, refreshProfile } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const { lang, setLang } = useLanguage();
   const { theme, setTheme } = useTheme();
   const [subPage, setSubPage] = useState<SubPage>('main');
@@ -31,8 +31,7 @@ export default function SettingsView({ onViewProfile }: any) {
         {subPage === 'main' && (
           <motion.div key="main" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 space-y-3 pb-24">
             <h2 className="text-[26px] font-bold mb-4 text-white">Настройки</h2>
-            
-            <div className="bg-white/5 rounded-3xl p-5 flex items-center gap-4 mb-4 cursor-pointer border border-white/10" onClick={() => setSubPage('profile')}>
+            <div className="bg-white/5 rounded-3xl p-5 flex items-center gap-4 mb-4 cursor-pointer border border-white/10" onClick={() => onViewProfile && onViewProfile(profile?.id)}>
               {profile?.avatar_url ? <img src={profile.avatar_url} className="w-16 h-16 rounded-full object-cover" /> : <div className="w-16 h-16 rounded-full bg-blue-500" />}
               <div className="flex-1">
                 <div className="flex items-center gap-1.5">
@@ -50,7 +49,6 @@ export default function SettingsView({ onViewProfile }: any) {
                 <div className="flex-1 text-left"><span className="font-medium block text-white">{label}</span><span className="text-xs block text-gray-400">{desc}</span></div>
               </button>
             ))}
-            
             <button onClick={() => signOut()} className="w-full py-3 rounded-2xl mt-4 bg-red-500/10 text-red-500 font-semibold">Выйти</button>
           </motion.div>
         )}
@@ -64,8 +62,8 @@ export default function SettingsView({ onViewProfile }: any) {
               <p className="text-gray-400 text-sm">Ваш баланс</p>
               <p className="text-4xl font-bold text-white mb-6">{(profile as any)?.leaves || 0} 🍃</p>
               <div className="flex gap-2">
-                <button className="flex-1 py-3 bg-blue-500 text-white rounded-xl font-bold opacity-50 cursor-not-allowed">Пополнить</button>
-                <button className="flex-1 py-3 bg-white/10 text-white rounded-xl font-bold opacity-50 cursor-not-allowed">Отправить</button>
+                <button className="flex-1 py-3 bg-blue-500 text-white rounded-xl font-bold opacity-50">Пополнить</button>
+                <button className="flex-1 py-3 bg-white/10 text-white rounded-xl font-bold opacity-50">Отправить</button>
               </div>
             </div>
             <h3 className="text-white font-bold mt-8 mb-2">Транзакции</h3>
