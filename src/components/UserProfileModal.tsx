@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { supabase, Profile } from '@/lib/supabase';
-import { BackIcon, PlayIcon, PauseIcon, VerifiedIcon, HeartIcon, MusicIcon } from '@/components/Icons';
+import { supabase } from '@/lib/supabase';
+import { BackIcon, PlayIcon, PauseIcon, VerifiedIcon, HeartIcon } from '@/components/Icons';
 
 export default function UserProfileModal({ profileId, onClose }: any) {
   const [profile, setProfile] = useState<any>(null);
@@ -15,10 +15,8 @@ export default function UserProfileModal({ profileId, onClose }: any) {
     const load = async () => {
       const { data: p } = await supabase.from('profiles').select('*').eq('id', profileId).single();
       if (p) setProfile(p);
-
       const { data: po } = await supabase.from('user_posts').select('*').eq('user_id', profileId).order('created_at', { ascending: false });
       if (po) setPosts(po);
-
       const { data: so } = await supabase.from('user_songs').select('*').eq('user_id', profileId);
       if (so) setSongs(so);
     };
@@ -50,42 +48,36 @@ export default function UserProfileModal({ profileId, onClose }: any) {
 
       <div className="mt-16 flex flex-col items-center px-4 pb-10">
         <div className="flex items-center gap-1.5">
-          <h2 className="text-2xl font-bold text-white">{profile.display_name}</h2>
+          <h2 className="text-2xl font-bold text-white">{profile.display_name || profile.username}</h2>
           {profile.is_verified && <VerifiedIcon size={24} />}
         </div>
-        <p className="text-gray-400">@{profile.username}</p>
+        <p className="text-gray-400 mb-4">@{profile.username}</p>
 
         {songs.length > 0 && (
-          <div className="w-full max-w-sm mt-6 bg-[#1a1a1a] rounded-2xl border border-white/10 p-3">
+          <div className="w-full max-w-sm bg-[#1a1a1a] rounded-2xl border border-white/10 p-3 mb-6">
             {songs.map(s => (
               <div key={s.id} onClick={() => togglePlay(s)} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl cursor-pointer">
                 <button className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white">
                   {currentSong?.id === s.id && isPlaying ? <PauseIcon size={18} /> : <PlayIcon size={18} />}
                 </button>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-semibold text-sm truncate">{s.title}</p>
-                </div>
+                <div className="flex-1 min-w-0"><p className="text-white font-semibold text-sm truncate">{s.title}</p></div>
               </div>
             ))}
             <audio ref={audioRef} src={currentSong?.url} onEnded={() => setIsPlaying(false)} />
           </div>
         )}
 
-        <div className="w-full max-w-sm mt-8 space-y-4">
+        <div className="w-full max-w-sm space-y-4">
           <h3 className="text-white font-bold text-lg">Посты</h3>
-          {posts.length === 0 ? (
-            <p className="text-gray-500 text-center text-sm">Еще нет постов</p>
-          ) : (
-            posts.map(post => (
-              <div key={post.id} className="bg-[#1a1a1a] p-4 rounded-2xl border border-white/10">
-                <p className="text-white text-sm mb-3">{post.content}</p>
-                <div className="flex items-center gap-4 text-gray-500 text-xs">
-                  <span className="flex items-center gap-1"><HeartIcon size={16} /> {post.likes_count || 0}</span>
-                  <span>👁️ {post.views_count || 0}</span>
-                </div>
+          {posts.length === 0 ? <p className="text-gray-500 text-center text-sm">Еще нет постов</p> : posts.map(post => (
+            <div key={post.id} className="bg-[#1a1a1a] p-4 rounded-2xl border border-white/10">
+              <p className="text-white text-sm mb-3">{post.content}</p>
+              <div className="flex items-center gap-4 text-gray-500 text-xs">
+                <span className="flex items-center gap-1"><HeartIcon size={16} /> {post.likes_count || 0}</span>
+                <span>👁️ {post.views_count || 0}</span>
               </div>
-            ))
-          )}
+            </div>
+          ))}
         </div>
       </div>
     </motion.div>
