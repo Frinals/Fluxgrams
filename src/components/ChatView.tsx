@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase, Profile } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { BackIcon, SendIcon, PhoneIcon, PaperclipIcon, ImageIcon, PlayIcon, PauseIcon, XIcon, TrashIcon, MusicIcon } from '@/components/Icons';
 
@@ -62,7 +62,7 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: any) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0f1115] relative">
+    <div className="flex flex-col h-full" style={{ background: 'var(--app-bg-gradient)' }}>
       <div className="flex items-center gap-3 p-4 bg-[#1a1a1a] border-b border-white/10 z-20 sticky top-0">
         <button onClick={onBack} className="p-2 text-white"><BackIcon size={22} /></button>
         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -110,7 +110,3 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: any) {
     </div>
   );
 }
-<div
-  className="flex-1 overflow-y-auto p-4"
-  style={{ background: 'var(--app-bg-gradient)' }}
->
