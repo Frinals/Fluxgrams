@@ -1,18 +1,60 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { themes, themeList } from '@/lib/types';
-import { UserIcon, LockIcon, PaletteIcon, ChevronRightIcon, BellIcon, BackIcon, UsersIcon, VerifiedIcon, LeafIcon } from '@/components/Icons';
+import { supabase } from '@/lib/supabase';
+import { UserIcon, LockIcon, PaletteIcon, ChevronRightIcon, BellIcon, BackIcon, UsersIcon, VerifiedIcon, LeafIcon, ImageIcon } from '@/components/Icons';
 
-type SubPage = 'main' | 'privacy' | 'appearance' | 'notifications' | 'accounts' | 'currency';
+type SubPage = 'main' | 'edit_profile' | 'privacy' | 'appearance' | 'notifications' | 'currency';
 
 export default function SettingsView({ onViewProfile }: any) {
-  const { profile, signOut } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const [subPage, setSubPage] = useState<SubPage>('main');
+  
+  // Стейты для редактирования профиля
+  const [editName, setEditName] = useState(profile?.display_name || '');
+  const [editUsername, setEditUsername] = useState(profile?.username || '');
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const musicInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    setIsSaving(true);
+    await supabase.from('profiles').update({ 
+      display_name: editName.trim(), 
+      username: editUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') 
+    }).eq('id', user.id);
+    
+    await refreshProfile();
+    setIsSaving(false);
+    setSubPage('main');
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'music') => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    
+    const fileName = `profile/${user.id}/${type}_${Date.now()}.${file.name.split('.').pop()}`;
+    const { error } = await supabase.storage.from('media').upload(fileName, file);
+    if (error) { alert(error.message); return; }
+
+    const { data } = supabase.storage.from('media').getPublicUrl(fileName);
+
+    if (type === 'music') {
+      const newSong = { title: file.name.split('.')[0], url: data.publicUrl };
+      const currentMusic = profile?.profile_music || [];
+      await supabase.from('profiles').update({ profile_music: [...currentMusic, newSong] }).eq('id', user.id);
+    } else {
+      await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', user.id);
+    }
+    await refreshProfile();
+    alert('Успешно загружено!');
+  };
 
   const cards = [
-    { key: 'accounts', icon: UsersIcon, label: 'Аккаунты', desc: 'Управление' },
     { key: 'notifications', icon: BellIcon, label: 'Уведомления', desc: 'Звуки' },
     { key: 'privacy', icon: LockIcon, label: 'Приватность', desc: 'Кто пишет' },
     { key: 'appearance', icon: PaletteIcon, label: 'Оформление', desc: 'Темы' },
@@ -20,64 +62,91 @@ export default function SettingsView({ onViewProfile }: any) {
   ];
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto bg-[#0f1115]">
+    <div className="flex flex-col h-full overflow-y-auto" style={{ background: 'var(--app-bg)' }}>
+      
       {subPage === 'main' && (
         <div className="p-4 space-y-3 pb-24">
-          <h2 className="text-[26px] font-bold mb-4 text-white">Настройки</h2>
+          <h2 className="text-[26px] font-bold mb-4" style={{ color: 'var(--app-text)' }}>Настройки</h2>
           
-          {/* Клик по этой карточке открывает модалку профиля */}
-          <div className="bg-white/5 rounded-3xl p-5 flex items-center gap-4 mb-4 cursor-pointer border border-white/10" onClick={() => onViewProfile && onViewProfile(profile?.id)}>
-            {profile?.avatar_url ? <img src={profile.avatar_url} className="w-16 h-16 rounded-full object-cover" /> : <div className="w-16 h-16 rounded-full bg-blue-500" />}
+          {/* Просто смотрим профиль */}
+          <div onClick={() => onViewProfile(profile?.id)} className="rounded-3xl p-5 flex items-center gap-4 mb-4 cursor-pointer border" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
+            {profile?.avatar_url ? <img src={profile.avatar_url} className="w-16 h-16 rounded-full object-cover" /> : <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold" style={{ background: 'var(--app-accent)' }}>{profile?.display_name?.[0] || 'U'}</div>}
             <div className="flex-1">
               <div className="flex items-center gap-1.5">
-                <p className="font-bold text-lg text-white">{profile?.display_name || 'User'}</p>
+                <p className="font-bold text-lg" style={{ color: 'var(--app-text)' }}>{profile?.display_name || 'User'}</p>
                 {profile?.is_verified && <VerifiedIcon size={18} className="text-blue-500" />}
               </div>
-              <p className="text-sm text-gray-400">@{profile?.username || 'user'}</p>
+              <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>@{profile?.username || 'user'}</p>
             </div>
-            <ChevronRightIcon size={18} color="#666" />
+            <ChevronRightIcon size={18} color="var(--app-text-muted)" />
           </div>
+
+          {/* Кнопка настройки аккаунта */}
+          <button onClick={() => setSubPage('edit_profile')} className="border rounded-2xl w-full p-4 flex items-center gap-3 mb-2" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white" style={{ background: 'var(--app-accent)' }}><UsersIcon size={20} /></div>
+            <div className="flex-1 text-left">
+              <span className="font-medium block" style={{ color: 'var(--app-text)' }}>Аккаунты</span>
+              <span className="text-xs block" style={{ color: 'var(--app-text-muted)' }}>Ник, юзернейм, музыка</span>
+            </div>
+          </button>
 
           {cards.map(({ key, icon: Icon, label, desc }) => (
-            <button key={key} onClick={() => setSubPage(key as SubPage)} className="bg-white/5 border border-white/10 rounded-2xl w-full p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-500"><Icon size={20} color="white" /></div>
-              <div className="flex-1 text-left"><span className="font-medium block text-white">{label}</span><span className="text-xs block text-gray-400">{desc}</span></div>
+            <button key={key} onClick={() => setSubPage(key as SubPage)} className="border rounded-2xl w-full p-4 flex items-center gap-3" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white" style={{ background: 'var(--app-accent)' }}><Icon size={20} /></div>
+              <div className="flex-1 text-left"><span className="font-medium block" style={{ color: 'var(--app-text)' }}>{label}</span><span className="text-xs block" style={{ color: 'var(--app-text-muted)' }}>{desc}</span></div>
             </button>
           ))}
-          <button onClick={() => signOut()} className="w-full py-3 rounded-2xl mt-4 bg-red-500/10 text-red-500 font-semibold">Выйти</button>
+          <button onClick={() => signOut()} className="w-full py-3 rounded-2xl mt-4 font-semibold" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>Выйти</button>
         </div>
       )}
 
-      {subPage === 'currency' && (
+      {/* ЭКРАН РЕДАКТИРОВАНИЯ ПРОФИЛЯ */}
+      {subPage === 'edit_profile' && (
         <div className="p-4 pb-24">
-          <button onClick={() => setSubPage('main')} className="mb-4 text-white flex items-center gap-2"><BackIcon size={22} /> Назад</button>
-          <h2 className="text-xl font-bold text-white mb-4">Валюта</h2>
-          <div className="bg-white/5 p-6 rounded-3xl border border-white/10 text-center">
-            <LeafIcon size={48} color="#2ecc71" className="mx-auto mb-2" />
-            <p className="text-4xl font-bold text-white mb-6">{(profile as any)?.leaves || 0} 🍃</p>
+          <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
+          <h2 className="text-2xl font-bold mb-6" style={{ color: 'var(--app-text)' }}>Настройка аккаунта</h2>
+          
+          <div className="flex flex-col items-center mb-6">
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full overflow-hidden border-4" style={{ borderColor: 'var(--app-surface)' }}>
+                {profile?.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-white" style={{ background: 'var(--app-accent)' }}>U</div>}
+              </div>
+              <button onClick={() => avatarInputRef.current?.click()} className="absolute bottom-0 right-0 p-2 rounded-full text-white border-2" style={{ background: 'var(--app-accent)', borderColor: 'var(--app-bg)' }}><ImageIcon size={16} /></button>
+              <input type="file" ref={avatarInputRef} hidden accept="image/*" onChange={(e) => handleFileUpload(e, 'avatar')} />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm mb-1" style={{ color: 'var(--app-text-muted)' }}>Имя (как тебя видят)</label>
+              <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-3 rounded-xl border outline-none" style={{ background: 'var(--app-surface)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
+            </div>
+            <div>
+              <label className="block text-sm mb-1" style={{ color: 'var(--app-text-muted)' }}>Юзернейм (@)</label>
+              <input type="text" value={editUsername} onChange={e => setEditUsername(e.target.value)} className="w-full p-3 rounded-xl border outline-none" style={{ background: 'var(--app-surface)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }} placeholder="например: flux" />
+            </div>
+            
+            <div className="pt-4 border-t" style={{ borderColor: 'var(--app-border)' }}>
+              <label className="block text-sm mb-2" style={{ color: 'var(--app-text-muted)' }}>Музыка в профиль</label>
+              <button onClick={() => musicInputRef.current?.click()} className="w-full p-3 rounded-xl border text-center font-medium" style={{ background: 'var(--app-surface)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }}>
+                + Загрузить трек (mp3)
+              </button>
+              <input type="file" ref={musicInputRef} hidden accept="audio/*" onChange={(e) => handleFileUpload(e, 'music')} />
+            </div>
+
+            <button onClick={handleSaveProfile} disabled={isSaving} className="w-full py-4 rounded-2xl font-bold text-white mt-6 disabled:opacity-50" style={{ background: 'var(--app-accent)' }}>
+              {isSaving ? 'Сохранение...' : 'Сохранить'}
+            </button>
           </div>
         </div>
       )}
 
-      {subPage === 'appearance' && (
+      {/* Заглушки для остальных страниц */}
+      {['privacy', 'notifications', 'currency', 'appearance'].includes(subPage) && (
         <div className="p-4 pb-24">
-          <button onClick={() => setSubPage('main')} className="mb-4 text-white flex items-center gap-2"><BackIcon size={22} /> Назад</button>
-          <div className="grid grid-cols-3 gap-3 mb-6">
-             {themeList.map((key) => (
-                <button key={key} onClick={() => setTheme(key)} className="p-3 rounded-xl border flex flex-col items-center gap-2" style={{ background: theme === key ? 'var(--app-surface)' : 'transparent', borderColor: theme === key ? 'var(--app-accent)' : 'var(--app-border)' }}>
-                  <div className="w-10 h-10 rounded-full" style={{ background: themes[key].accentGradient }} />
-                  <span className="text-xs text-white">{key}</span>
-                </button>
-             ))}
-          </div>
-        </div>
-      )}
-
-      {['privacy', 'accounts', 'notifications'].includes(subPage) && (
-        <div className="p-4 pb-24">
-          <button onClick={() => setSubPage('main')} className="mb-4 text-white flex items-center gap-2"><BackIcon size={22} /> Назад</button>
-          <h2 className="text-xl font-bold text-white mb-4 capitalize">{subPage}</h2>
-          <p className="text-gray-400 text-sm">Этот раздел в разработке.</p>
+          <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
+          <h2 className="text-xl font-bold capitalize mb-4" style={{ color: 'var(--app-text)' }}>{subPage}</h2>
+          <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>Раздел в разработке.</p>
         </div>
       )}
     </div>
