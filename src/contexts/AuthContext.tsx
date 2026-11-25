@@ -30,17 +30,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
       if (!error && data) setProfile(data as Profile);
     } catch (err) {
-      console.error("Профиль не загружен", err);
+      console.error("Ошибка профиля", err);
     }
   };
 
   useEffect(() => {
     let isMounted = true;
 
-    // ТАЙМЕР: Если Supabase не отвечает 4 секунды, принудительно выключаем загрузку
+    // АВАРИЙНЫЙ ТАЙМЕР: Если Supabase завис, через 4 секунды выключаем загрузку
     const timeoutId = setTimeout(() => {
-      if (isMounted) {
-        console.warn("Supabase завис. Принудительный вход.");
+      if (isMounted && loading) {
+        console.warn("Supabase не ответил вовремя. Принудительный запуск.");
         setLoading(false);
       }
     }, 4000);
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       clearTimeout(timeoutId);
     }).catch((err) => {
-      console.error("Ошибка соединения:", err);
+      console.error("Ошибка соединения с Supabase:", err);
       if (isMounted) {
         setLoading(false);
         clearTimeout(timeoutId);
