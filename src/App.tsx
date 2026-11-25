@@ -119,3 +119,25 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+import { useCall } from '@/hooks/useCall';
+import { motion } from 'framer-motion';
+
+function MessengerApp() {
+  const { startCall, callState, acceptCall, endCall, remotePeer } = useCall();
+  // ...
+  return (
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-black">
+      {/* ... остальной код ... */}
+      {callState === 'incoming' && (
+        <motion.div initial={{ y: -100 }} animate={{ y: 0 }} className="fixed top-4 left-4 right-4 bg-[#1a1a1a] p-4 rounded-2xl shadow-2xl z-[9999] flex items-center justify-between border border-white/10">
+          <div><p className="text-white font-bold">Входящий звонок</p><p className="text-sm text-gray-400">от {remotePeer}</p></div>
+          <div className="flex gap-2">
+            <button onClick={acceptCall} className="px-4 py-2 bg-green-500 text-white rounded-xl font-bold">Принять</button>
+            <button onClick={endCall} className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold">Отклонить</button>
+          </div>
+        </motion.div>
+      )}
+      {/* ... */}
+    </div>
+  );
+}
