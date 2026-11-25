@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { PlayIcon, PauseIcon, VerifiedIcon, XIcon } from '@/components/Icons'; // Убрал HeartIcon, EyeIcon
+import { PlayIcon, PauseIcon, VerifiedIcon, XIcon } from '@/components/Icons';
 
 export default function UserProfileModal({ profileId, onClose }: any) {
   const { user } = useAuth();
@@ -123,7 +123,6 @@ export default function UserProfileModal({ profileId, onClose }: any) {
                     userPosts.map(post => (
                       <div key={post.id} className="p-4 rounded-2xl border" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
                         <p className="text-[15px] mb-3" style={{ color: 'var(--app-text)' }}>{post.content}</p>
-                        {/* ИСПОЛЬЗУЕМ ЭМОДЗИ ВМЕСТО ИКОНОК */}
                         <div className="flex items-center gap-4 text-sm" style={{ color: 'var(--app-text-muted)' }}>
                           <span className="flex items-center gap-1">❤️ {post.likes || 0}</span>
                           <span className="flex items-center gap-1">👁️ {post.views || 0}</span>
