@@ -12,6 +12,7 @@ import SettingsView from '@/components/SettingsView';
 import UserProfileModal from '@/components/UserProfileModal';
 import SearchView from '@/components/SearchView';
 import FeedView from '@/components/FeedView';
+import CallScreen from '@/components/CallScreen'; // <-- Импорт
 import { useCall } from '@/hooks/useCall';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
@@ -36,10 +37,17 @@ function MessengerApp() {
   const [postText, setPostText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
 
-  const { startCall, callState, acceptCall, endCall } = useCall();
+  // Вытаскиваем состояние звонка
+  const { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute } = useCall();
+  const [activeCallPeer, setActiveCallPeer] = useState<any>(null); // Чтобы хранить данные собеседника
 
   const handleOpenProfile = useCallback((id: string) => setViewingProfileId(id), []);
   const handleOpenChat = useCallback((chatId: string, peer: any) => setOpenChat({ chatId, peer }), []);
+
+  const handleStartCall = (peer: any) => {
+    setActiveCallPeer(peer); // Запоминаем кому звоним
+    startCall(peer.id);
+  };
 
   const handleCreatePost = async () => {
     if (!postText.trim() || !user) return;
@@ -57,19 +65,16 @@ function MessengerApp() {
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-black relative">
       
-      {/* ОКНО ВХОДЯЩЕГО ЗВОНКА */}
+      {/* ЭКРАН ЗВОНКА (Появляется поверх всего) */}
       <AnimatePresence>
-        {callState === 'incoming' && (
-          <motion.div initial={{ y: -100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -100, opacity: 0 }} className="fixed top-4 left-4 right-4 bg-[#1a1a1a] p-4 rounded-2xl shadow-2xl z-[99999] flex items-center justify-between border border-white/10">
-            <div>
-              <p className="text-white font-bold">Входящий звонок</p>
-              <p className="text-sm text-gray-400">Пользователь звонит вам</p>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={acceptCall} className="px-4 py-2 bg-green-500 text-white rounded-xl font-bold active:scale-95 transition-transform">Принять</button>
-              <button onClick={endCall} className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold active:scale-95 transition-transform">Сбросить</button>
-            </div>
-          </motion.div>
+        {callState !== 'idle' && (
+          <CallScreen 
+            callState={callState} 
+            peer={activeCallPeer || { display_name: 'Собеседник' }} 
+            isMuted={isMuted}
+            toggleMute={toggleMute}
+            endCall={endCall}
+          />
         )}
       </AnimatePresence>
 
@@ -80,7 +85,7 @@ function MessengerApp() {
             peer={openChat.peer} 
             group={null} 
             onBack={() => setOpenChat(null)} 
-            onCall={(peer: any) => startCall(peer.id)}
+            onCall={() => handleStartCall(openChat.peer)} // <-- Передаем объект peer
             onViewProfile={handleOpenProfile} 
           />
         ) : (
