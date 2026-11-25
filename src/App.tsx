@@ -128,3 +128,13 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+// Импортируй FeedView
+import FeedView from '@/components/FeedView';
+import BottomNav, { Tab } from '@/components/BottomNav';
+
+// Внутри MessengerApp:
+const [activeTab, setActiveTab] = useState<Tab>('chats');
+
+// Замени рендер табов:
+{activeTab === 'feed' && <FeedView onViewProfile={(id: string) => setViewingProfileId(id)} />}
+// И добавь обработку кнопки "Написать" из поиска
