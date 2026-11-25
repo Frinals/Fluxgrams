@@ -36,12 +36,9 @@ function MessengerApp() {
   useEffect(() => {
     const check = async () => {
       try {
-        // Используем maybeSingle, чтобы не было ошибки, если таблица пуста
         const { data } = await supabase.from('app_settings').select('is_maintenance').eq('id', 1).maybeSingle();
         if (data?.is_maintenance) setIsMaintenance(true);
-      } catch (error) {
-        console.error("Ошибка проверки тех. работ:", error);
-      }
+      } catch (e) {}
     };
     check();
   }, []);
@@ -59,8 +56,7 @@ function MessengerApp() {
     </div>
   );
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-[#0f1115] text-white text-xl font-bold">Загрузка...</div>;
-
+  if (loading) return <div className="h-screen flex items-center justify-center bg-[#0f1115] text-white">Загрузка...</div>;
   if (!user || needsEmailVerification) return <AuthScreen />;
 
   return (
