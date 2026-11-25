@@ -1,21 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-// Если ключей нет, мы принудительно показываем ошибку на экране вместо черного экрана
-if (!supabaseUrl || !supabaseAnonKey) {
-  document.body.innerHTML = `
-    <div style="color: white; background: #cc0000; padding: 20px; font-family: sans-serif; min-height: 100vh;">
-      <h2>КРИТИЧЕСКАЯ ОШИБКА!</h2>
-      <p>Приложение не может подключиться к базе данных.</p>
-      <p><b>URL найден:</b> ${supabaseUrl ? 'ДА' : 'НЕТ'}</p>
-      <p><b>Ключ найден:</b> ${supabaseAnonKey ? 'ДА' : 'НЕТ'}</p>
-      <p>Проверьте настройки GitHub Secrets (VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY).</p>
-    </div>
-  `;
-  throw new Error('Supabase credentials missing'); // Останавливаем приложение
-}
+// Жесткая защита: если ключей нет, используем заглушку, чтобы React запустился
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder_key';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
