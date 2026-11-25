@@ -10,7 +10,7 @@ import ChatList from '@/components/ChatList';
 import ChatView from '@/components/ChatView';
 import SettingsView from '@/components/SettingsView';
 import UserProfileModal from '@/components/UserProfileModal';
-import FeedView from '@/components/FeedView'; // <-- Импортируем ленту
+import FeedView from '@/components/FeedView';
 
 function MessengerApp() {
   const { user, loading, needsEmailVerification } = useAuth();
@@ -18,26 +18,20 @@ function MessengerApp() {
   const [openChat, setOpenChat] = useState<any>(null);
   const [viewingProfileId, setViewingProfileId] = useState<string | null>(null);
   
-  // Состояния для создания поста
   const [showPostModal, setShowPostModal] = useState(false);
   const [postText, setPostText] = useState('');
-  const [isPosting, setIsPosting] = useState(false);
 
   const handleCreatePost = async () => {
     if (!postText.trim() || !user) return;
-    setIsPosting(true);
     await supabase.from('user_posts').insert({ user_id: user.id, content: postText });
-    setPostText(''); 
-    setShowPostModal(false);
-    setIsPosting(false);
-    setActiveTab('search'); // Перекидываем на ленту после публикации
+    setPostText(''); setShowPostModal(false); setActiveTab('search');
   };
 
   if (loading) return <div className="h-[100dvh] flex items-center justify-center font-bold" style={{ background: 'var(--app-bg)', color: 'var(--app-text)' }}>Загрузка...</div>;
   if (!user || needsEmailVerification) return <AuthScreen />;
 
   return (
-    <div className="h-[100dvh] flex flex-col" style={{ background: 'var(--app-bg)' }}>
+    <div className="h-[100dvh] flex flex-col overflow-hidden" style={{ background: 'var(--app-bg)' }}>
       <div className="flex-1 relative overflow-hidden">
         {openChat ? (
           <ChatView 
@@ -57,12 +51,7 @@ function MessengerApp() {
               />
             )}
             {activeTab === 'settings' && <SettingsView onViewProfile={(id: string) => setViewingProfileId(id)} />}
-            
-            {/* Вкладка поиска временно показывает ленту постов */}
-            {activeTab === 'search' && (
-              <FeedView onViewProfile={(id: string) => setViewingProfileId(id)} />
-            )}
-            
+            {activeTab === 'search' && <FeedView onViewProfile={(id: string) => setViewingProfileId(id)} />}
             {activeTab === 'calls' && (
               <div className="h-full flex flex-col items-center justify-center" style={{ color: 'var(--app-text)' }}>
                 <div className="text-6xl mb-4">📞</div>
@@ -75,48 +64,20 @@ function MessengerApp() {
 
       {!openChat && <BottomNav active={activeTab} onChange={setActiveTab} onCreatePost={() => setShowPostModal(true)} />}
 
+      {/* Модалка профиля с анимацией */}
       <AnimatePresence>
         {viewingProfileId && <UserProfileModal profileId={viewingProfileId} onClose={() => setViewingProfileId(null)} />}
       </AnimatePresence>
 
-      {/* Модалка создания поста */}
       <AnimatePresence>
         {showPostModal && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
-            className="fixed inset-0 z-[999] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm"
-            onClick={() => setShowPostModal(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-              className="rounded-3xl p-5 w-full max-w-md border shadow-2xl" 
-              style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
-              onClick={e => e.stopPropagation()}
-            >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowPostModal(false)}>
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="rounded-3xl p-5 w-full max-w-md border shadow-2xl" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }} onClick={e => e.stopPropagation()}>
               <h2 className="font-bold text-xl mb-4" style={{ color: 'var(--app-text)' }}>Новый пост</h2>
-              <textarea 
-                value={postText} 
-                onChange={e => setPostText(e.target.value)} 
-                placeholder="О чем думаешь?" 
-                className="w-full h-32 p-4 rounded-2xl outline-none resize-none border text-[16px]" 
-                style={{ background: 'var(--app-bg)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }}
-              />
+              <textarea value={postText} onChange={e => setPostText(e.target.value)} placeholder="О чем думаешь?" className="w-full h-32 p-4 rounded-2xl outline-none resize-none border text-[16px]" style={{ background: 'var(--app-bg)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
               <div className="flex gap-3 mt-4">
-                <button 
-                  onClick={() => setShowPostModal(false)} 
-                  className="flex-1 py-3 rounded-2xl font-semibold"
-                  style={{ background: 'var(--app-bg)', color: 'var(--app-text)' }}
-                >
-                  Отмена
-                </button>
-                <button 
-                  onClick={handleCreatePost} 
-                  disabled={isPosting || !postText.trim()}
-                  className="flex-1 py-3 rounded-2xl font-semibold text-white disabled:opacity-50"
-                  style={{ background: 'var(--app-accent)' }}
-                >
-                  {isPosting ? 'Публикация...' : 'Опубликовать'}
-                </button>
+                <button onClick={() => setShowPostModal(false)} className="flex-1 py-3 rounded-2xl font-semibold" style={{ background: 'var(--app-bg)', color: 'var(--app-text)' }}>Отмена</button>
+                <button onClick={handleCreatePost} disabled={!postText.trim()} className="flex-1 py-3 rounded-2xl font-semibold text-white disabled:opacity-50" style={{ background: 'var(--app-accent)' }}>Опубликовать</button>
               </div>
             </motion.div>
           </motion.div>
