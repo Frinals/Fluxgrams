@@ -26,19 +26,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
 
   const fetchProfile = async (uid: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', uid)
-      .maybeSingle();
-    if (!error && data) {
-      setProfile(data as Profile);
-    } else if (error) {
-      console.error('[AuthContext] fetchProfile error:', error);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', uid)
+        .maybeSingle();
+      if (!error && data) {
+        setProfile(data as Profile);
+      } else if (error) {
+        console.error('[AuthContext] fetchProfile error:', error);
+      }
+    } catch (err) {
+      console.error('[AuthContext] Ошибка при получении профиля:', err);
     }
   };
 
   useEffect(() => {
+    // Оборачиваем в catch, чтобы при ошибке Supabase приложение не висело вечно
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -53,6 +58,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setLoading(false);
       }
+    }).catch((error) => {
+      console.error("Ошибка getSession (проверьте ключи Supabase):", error);
+      setLoading(false); // Принудительно выключаем загрузку при ошибке!
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -64,21 +72,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         } else {
           setNeedsEmailVerification(false);
-          (async () => {
-            await fetchProfile(session.user.id);
-          })();
+          fetchProfile(session.user.id).finally(() => setLoading(false));
         }
       } else {
         setProfile(null);
         setNeedsEmailVerification(false);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => {
       authListener.subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refreshProfile = async () => {
