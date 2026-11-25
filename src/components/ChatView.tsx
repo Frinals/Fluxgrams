@@ -110,3 +110,7 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: any) {
     </div>
   );
 }
+<div
+  className="flex-1 overflow-y-auto p-4"
+  style={{ background: 'var(--app-bg-gradient)' }}
+>
