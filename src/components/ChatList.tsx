@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { BookmarkIcon, GroupIcon, ChannelIcon, PlusIcon } from '@/components/Icons';
+import { BookmarkIcon, GroupIcon, ChannelIcon, PlusIcon, VerifiedIcon } from '@/components/Icons';
 import StoriesBar from '@/components/StoriesBar';
 
-export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: any) {
+export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup, onViewProfile }: any) {
   const { user, profile } = useAuth();
   const [chats, setChats] = useState<any[]>([]);
   const [savedMessagesChatId, setSavedMessagesChatId] = useState<string | null>(null);
@@ -58,7 +58,17 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: any
                 <ListItem id="saved" fallbackIcon={<BookmarkIcon size={22} />} name="Избранное" message="Личные заметки" onClick={() => onOpenChat(savedMessagesChatId, profile)} isSaved />
               )}
               {chats.map((c) => (
-                 <ListItem key={c.id} id={c.peer.id} avatarUrl={c.peer.avatar_url} fallbackText={(c.peer.display_name || '?').slice(0,2).toUpperCase()} name={c.peer.display_name || c.peer.username} message="Нажмите, чтобы открыть" onClick={() => onOpenChat(c.id, c.peer)} />
+                 <ListItem 
+                   key={c.id} 
+                   id={c.peer.id} 
+                   avatarUrl={c.peer.avatar_url} 
+                   fallbackText={(c.peer.display_name || '?').slice(0,2).toUpperCase()} 
+                   name={c.peer.display_name || c.peer.username} 
+                   message="Нажмите, чтобы открыть" 
+                   isVerified={c.peer.is_verified}
+                   onClick={() => onOpenChat(c.id, c.peer)} 
+                   onAvatarClick={() => onViewProfile && onViewProfile(c.peer.id)}
+                 />
               ))}
             </>
           )}
@@ -76,10 +86,10 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: any
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-30" onClick={() => setShowCreateMenu(false)} />
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-40 right-5 z-40 rounded-3xl p-2 shadow-2xl border glass-panel" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
-              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('group'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors">
+              <button onClick={() => { setShowCreateMenu(false); onCreateGroup && onCreateGroup('group'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors">
                 <GroupIcon size={18} /><span className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>Новая группа</span>
               </button>
-              <button onClick={() => { setShowCreateMenu(false); onCreateGroup('channel'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors">
+              <button onClick={() => { setShowCreateMenu(false); onCreateGroup && onCreateGroup('channel'); }} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors">
                 <ChannelIcon size={18} /><span className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>Новый канал</span>
               </button>
             </motion.div>
@@ -90,18 +100,21 @@ export default function ChatList({ onOpenChat, onOpenGroup, onCreateGroup }: any
   );
 }
 
-const ListItem = memo(function ListItem({ id, avatarUrl, fallbackIcon, fallbackText, name, message, onClick, isSaved }: any) {
+const ListItem = memo(function ListItem({ id, avatarUrl, fallbackIcon, fallbackText, name, message, onClick, onAvatarClick, isSaved, isVerified }: any) {
   return (
-    <motion.button whileTap={{ scale: 0.98 }} onClick={onClick} className="w-full flex items-center gap-4 px-2 py-3 rounded-2xl hover:bg-white/5 transition-colors">
-      <div className="relative flex-shrink-0">
+    <motion.div whileTap={{ scale: 0.98 }} onClick={onClick} className="w-full flex items-center gap-4 px-2 py-3 rounded-2xl hover:bg-white/5 transition-colors cursor-pointer">
+      <div className="relative flex-shrink-0" onClick={(e) => { e.stopPropagation(); onAvatarClick && onAvatarClick(); }}>
         <div className="w-[50px] h-[50px] rounded-full p-[2px]" style={{ background: isSaved ? 'var(--app-accent)' : 'var(--app-border)' }}>
           {avatarUrl ? <img src={avatarUrl} className="w-full h-full rounded-full object-cover border-2" style={{ borderColor: 'var(--app-bg)' }} /> : <div className="w-full h-full rounded-full flex items-center justify-center font-semibold border-2" style={{ background: 'var(--app-surface)', color: 'var(--app-text)', borderColor: 'var(--app-bg)' }}>{fallbackIcon || fallbackText || '?'}</div>}
         </div>
       </div>
       <div className="flex-1 text-left min-w-0">
-        <p className="font-semibold text-[16px] truncate" style={{ color: 'var(--app-text)' }}>{name || 'Пользователь'}</p>
+        <div className="flex items-center gap-1">
+          <p className="font-semibold text-[16px] truncate" style={{ color: 'var(--app-text)' }}>{name || 'Пользователь'}</p>
+          {isVerified && <VerifiedIcon size={16} className="text-blue-500" />}
+        </div>
         <p className="text-[14px] truncate" style={{ color: 'var(--app-text-muted)' }}>{message || '...'}</p>
       </div>
-    </motion.button>
+    </motion.div>
   );
 });
