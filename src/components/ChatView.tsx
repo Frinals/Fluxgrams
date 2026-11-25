@@ -9,6 +9,7 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState('');
   const [selectedMsg, setSelectedMsg] = useState<any | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loadMessages = useCallback(async () => {
@@ -24,13 +25,19 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
     const channel = supabase.channel(`chat_${chatId || group?.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new]);
+          setMessages(prev => {
+            // ЗАЩИТА ОТ ДУБЛИКАТОВ: Если сообщение с таким ID уже есть, не добавляем его
+            if (prev.some(m => m.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+          });
         }
+        if (payload.eventType === 'UPDATE') setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
+        if (payload.eventType === 'DELETE') setMessages(prev => prev.filter(m => m.id !== payload.old.id));
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [loadMessages]);
 
-  // Автоскролл вниз при новом сообщении
+  // Автоскролл вниз
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -38,22 +45,36 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
   const handleSend = async () => {
     if (!input.trim() || !user) return;
     const textToSend = input;
-    setInput('');
+    setInput(''); 
 
-    const tempId = Date.now().toString();
-    const newMsg = { id: tempId, sender_id: user.id, content: textToSend, created_at: new Date().toISOString(), chat_id: chatId };
-    setMessages(prev => [...prev, newMsg]);
+    if (isEditing && selectedMsg) {
+      await supabase.from('messages').update({ content: textToSend }).eq('id', selectedMsg.id);
+      setIsEditing(false); setSelectedMsg(null);
+    } else {
+      // 1. Временно показываем сообщение
+      const tempId = `temp-${Date.now()}`;
+      const newMsg = { id: tempId, sender_id: user.id, content: textToSend, created_at: new Date().toISOString(), chat_id: chatId };
+      setMessages(prev => [...prev, newMsg]);
 
-    await supabase.from('messages').insert({ sender_id: user.id, content: textToSend, chat_id: chatId, group_id: group?.id });
+      // 2. Отправляем в базу
+      const { data, error } = await supabase.from('messages').insert({ sender_id: user.id, content: textToSend, chat_id: chatId, group_id: group?.id }).select().single();
+      
+      // 3. Если сервер вернул настоящее сообщение, заменяем временное на настоящее
+      if (data && !error) {
+        setMessages(prev => {
+          const filtered = prev.filter(m => m.id !== tempId); // Убираем временное
+          if (filtered.some(m => m.id === data.id)) return filtered; // Если сервер уже прислал его через Realtime, не добавляем
+          return [...filtered, data];
+        });
+      }
+    }
   };
 
   return (
     <div className="flex flex-col h-[100dvh]" style={{ background: 'var(--app-bg)' }}>
-      {/* Шапка чата */}
       <div className="flex items-center gap-3 p-3 border-b z-20" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
         <button onClick={onBack} className="p-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /></button>
         
-        {/* КЛИК НА ШАПКУ ОТКРЫВАЕТ ПРОФИЛЬ */}
         <div onClick={() => onViewProfile && onViewProfile(peer?.id)} className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
           {peer?.avatar_url ? <img src={peer.avatar_url} className="w-10 h-10 rounded-full object-cover" /> : <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'var(--app-accent)' }}>{(peer?.display_name || 'U')[0]}</div>}
           <div className="flex-1 min-w-0">
@@ -67,7 +88,6 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
         {!group && <button onClick={() => onCall && onCall(peer, 'audio')} className="p-2" style={{ color: 'var(--app-accent)' }}><PhoneIcon size={20} /></button>}
       </div>
 
-      {/* Сообщения */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
         {messages.map(msg => (
           <div key={msg.id} className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
@@ -79,8 +99,7 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Поле ввода */}
-      <div className="p-2 border-t flex items-center gap-2" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
+      <div className="p-2 border-t flex items-center gap-2 pb-safe" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
         <button className="p-2" style={{ color: 'var(--app-text-muted)' }}><PaperclipIcon size={24} /></button>
         <input type="text" value={input} onChange={e => setInput(e.target.value)} placeholder="Сообщение..." className="flex-1 px-4 py-2.5 rounded-2xl outline-none border" style={{ background: 'var(--app-bg)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
         <button onClick={handleSend} className="p-2.5 rounded-full text-white" style={{ background: 'var(--app-accent)' }}><SendIcon size={20} /></button>
