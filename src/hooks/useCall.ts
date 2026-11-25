@@ -8,6 +8,7 @@ export function useCall() {
   const [remotePeer, setRemotePeer] = useState<any>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isMuted, setIsMuted] = useState(false); // <-- НОВОЕ
   
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const channelRef = useRef<any>(null);
@@ -97,20 +98,29 @@ export function useCall() {
     };
 
     pc.ontrack = (event) => setRemoteStream(event.streams[0]);
-
-    // Здесь должен быть SDP от звонящего (в упрощенном виде)
-    // В реальной реализации нужно передавать SDP через базу данных или Realtime
     channelRef.current?.send({ type: 'broadcast', event: 'call_accepted', payload: { sdp: pc.localDescription, to: remotePeer } });
   }, [remotePeer, user]);
 
+  // 4. Выключение микрофона
+  const toggleMute = useCallback(() => {
+    if (localStream) {
+      localStream.getAudioTracks().forEach(track => {
+        track.enabled = !track.enabled; // Реально отключает/включает микрофон
+      });
+      setIsMuted(prev => !prev);
+    }
+  }, [localStream]);
+
+  // 5. Завершение звонка
   const endCall = useCallback(() => {
     pcRef.current?.close();
-    localStream?.getTracks().forEach(t => t.stop());
+    localStream?.getTracks().forEach(t => t.stop()); // Выключаем микрофон
     setCallState('idle');
     setLocalStream(null);
     setRemoteStream(null);
     setRemotePeer(null);
+    setIsMuted(false);
   }, [localStream]);
 
-  return { callState, remotePeer, localStream, remoteStream, startCall, acceptCall, endCall };
+  return { callState, remotePeer, localStream, remoteStream, isMuted, startCall, acceptCall, endCall, toggleMute };
 }
