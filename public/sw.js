@@ -1,16 +1,23 @@
-self.addEventListener('push', function(event) {
-  if (event.data) {
-    const data = event.data.json();
-    const options = {
-      body: data.body,
-      icon: '/vite.svg',
-      badge: '/vite.svg',
-      vibrate: [100, 50, 100],
-    };
-    event.waitUntil(self.registration.showNotification(data.title, options));
-  }
+self.addEventListener('install', (e) => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+
+self.addEventListener('push', (event) => {
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || 'Новое сообщение';
+  const options = {
+    body: data.body || 'Откройте приложение, чтобы прочитать',
+    icon: '/Fluxgram/vite.svg',
+    badge: '/Fluxgram/vite.svg',
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
 });
-self.addEventListener('notificationclick', function(event) {
+
+self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(clients.openWindow('/'));
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then((clientList) => {
+      if (clientList.length > 0) return clientList[0].focus();
+      return clients.openWindow('/Fluxgram/');
+    })
+  );
 });
