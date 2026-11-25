@@ -3,121 +3,125 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
-import { supabase, Profile, Group, GroupType } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import AuthScreen from '@/components/AuthScreen';
 import BottomNav, { Tab } from '@/components/BottomNav';
 import ChatList from '@/components/ChatList';
 import ChatView from '@/components/ChatView';
-import CallsView from '@/components/CallsView';
-import SearchView from '@/components/SearchView';
 import SettingsView from '@/components/SettingsView';
-import IncomingCallModal from '@/components/IncomingCallModal';
-import OutgoingCallModal from '@/components/OutgoingCallModal';
-import { CreateGroupModal } from '@/components/CreateGroupModal';
 import UserProfileModal from '@/components/UserProfileModal';
 
-interface OutgoingCallState { peer: Profile; callType: 'audio' | 'video'; chatId: string | null; }
-
-class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
-  constructor(props: any) { super(props); this.state = { hasError: false, error: null }; }
-  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+class ErrorBoundary extends React.Component<any, any> {
+  state = { hasError: false, error: null };
+  static getDerivedStateFromError(error: any) { return { hasError: true, error }; }
   render() {
-    if (this.state.hasError) return <div style={{ padding: 20, background: 'red', color: 'white', minHeight: '100vh' }}><h1>Ошибка!</h1><p>{this.state.error?.message}</p></div>;
+    if (this.state.hasError) return <div style={{ padding: 20, background: 'red', color: 'white', minHeight: '100vh' }}><h1>Ошибка!</h1><p>{this.state.error.message}</p></div>;
     return this.props.children;
   }
-}
-
-function GlobalManager() {
-  const { user } = useAuth();
-  const [banner, setBanner] = useState<any>(null);
-
-  useEffect(() => {
-    // РЕГИСТРАЦИЯ SERVICE WORKER ДЛЯ УВЕДОМЛЕНИЙ
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(console.error);
-    }
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    const notifSub = supabase.channel('global_banners')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-        if (payload.new && payload.new.sender_id !== user.id) {
-          const text = payload.new.content || 'Вложение';
-          setBanner({ title: 'Новое сообщение', text });
-          setTimeout(() => setBanner(null), 4000);
-          if (document.hidden && Notification.permission === 'granted') {
-             new Notification('Новое сообщение в Fluxgram!', { body: text });
-          }
-        }
-      }).subscribe();
-    return () => { supabase.removeChannel(notifSub); };
-  }, [user]);
-
-  return (
-    <>
-      <AnimatePresence>
-        {banner && (
-          <motion.div initial={{ y: -100 }} animate={{ y: 20 }} exit={{ y: -100 }} className="fixed top-0 left-4 right-4 z-[9999] bg-[#1a1a1a] border border-white/10 p-4 rounded-2xl flex items-center gap-3 shadow-2xl">
-            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white">✉️</div>
-            <div><p className="text-white font-bold text-sm">{banner.title}</p><p className="text-gray-400 text-xs">{banner.text}</p></div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <IncomingCallModal />
-    </>
-  );
 }
 
 function MessengerApp() {
   const { user, loading, needsEmailVerification } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('chats');
-  const [openChat, setOpenChat] = useState<any | null>(null);
-  const [openGroup, setOpenGroup] = useState<Group | null>(null);
-  const [outgoingCall, setOutgoingCall] = useState<OutgoingCallState | null>(null);
-  const [createModalType, setCreateModalType] = useState<GroupType | null>(null);
+  const [openChat, setOpenChat] = useState<any>(null);
   const [viewingProfileId, setViewingProfileId] = useState<string | null>(null);
+  const [isMaintenance, setIsMaintenance] = useState(false);
+  
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [postText, setPostText] = useState('');
 
-  const handleCall = async (peer: Profile, callType: 'audio' | 'video') => {
-    if (!user) return;
-    const { data: chatId } = await supabase.rpc('create_chat_with_participants', { peer_id: peer.id });
-    if (chatId) setOutgoingCall({ peer, callType, chatId });
+  useEffect(() => {
+    const check = async () => {
+      const { data } = await supabase.from('app_settings').select('is_maintenance').eq('id', 1).single();
+      if (data?.is_maintenance) setIsMaintenance(true);
+    };
+    check();
+  }, []);
+
+  const handleCreatePost = async () => {
+    if (!postText.trim() || !user) return;
+    await supabase.from('user_posts').insert({ user_id: user.id, content: postText });
+    setPostText(''); setShowPostModal(false); alert('Пост опубликован!');
   };
 
-  if (loading) return <div className="min-h-screen bg-[#0f1115] flex items-center justify-center text-white">Загрузка...</div>;
+  if (isMaintenance) return (
+    <div className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[#0f1115] p-6 text-center">
+      <div className="text-6xl mb-6">🛠️</div><h1 className="text-3xl font-bold text-white mb-2">Технические работы</h1>
+      <button onClick={() => window.location.href = 'about:blank'} className="mt-8 px-8 py-3 bg-red-500 text-white font-bold rounded-xl">Выйти</button>
+    </div>
+  );
+
+  if (loading) return <div className="h-screen bg-[#0f1115]" />;
   if (!user || needsEmailVerification) return <AuthScreen />;
 
   return (
-    <div className="h-screen flex flex-col relative overflow-hidden bg-[#0f1115]">
-      <GlobalManager />
-      <div className="flex-1 overflow-hidden relative">
-        <AnimatePresence mode="wait">
-          {openChat ? (
-            <motion.div key="chat" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full absolute inset-0">
-              <ChatView chatId={openChat.chatId} peer={openChat.peer} group={null} onBack={() => setOpenChat(null)} onCall={handleCall} />
+    <div className="h-screen flex flex-col bg-[#0f1115]">
+      <div className="flex-1 relative overflow-hidden">
+        {openChat ? (
+          <ChatView 
+            chatId={openChat.chatId} 
+            peer={openChat.peer} 
+            group={null} 
+            onBack={() => setOpenChat(null)} 
+            onCall={() => alert('Звонки в разработке')} 
+          />
+        ) : (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="absolute inset-0"
+            >
+              {activeTab === 'chats' && (
+                <ChatList 
+                  onOpenChat={(chatId: string, peer: any) => setOpenChat({ chatId, peer })} 
+                  onOpenGroup={() => {}} 
+                />
+              )}
+              {activeTab === 'settings' && (
+                <SettingsView onViewProfile={(id: string) => setViewingProfileId(id)} />
+              )}
+              {activeTab === 'search' && (
+                <div className="p-4 text-white">Поиск в разработке</div>
+              )}
+              {activeTab === 'calls' && (
+                <div className="p-4 text-white">Звонки в разработке</div>
+              )}
             </motion.div>
-          ) : openGroup ? (
-            <motion.div key="group" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full absolute inset-0">
-              <ChatView chatId={null} peer={{}} group={openGroup} onBack={() => setOpenGroup(null)} onCall={handleCall} />
-            </motion.div>
-          ) : (
-            <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full absolute inset-0">
-              {activeTab === 'chats' && <ChatList onOpenChat={(chatId, peer) => setOpenChat({ chatId, peer })} onOpenGroup={setOpenGroup} onCreateGroup={setCreateModalType} />}
-              {activeTab === 'search' && <SearchView onOpenChat={(chatId, peer) => setOpenChat({ chatId, peer })} onOpenGroup={setOpenGroup} onViewProfile={(p) => setViewingProfileId(p.id)} />}
-              {activeTab === 'calls' && <CallsView />}
-              {activeTab === 'settings' && <SettingsView />}
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </AnimatePresence>
+        )}
       </div>
-      {!openChat && !openGroup && <div className="flex-shrink-0 relative z-50"><BottomNav active={activeTab} onChange={setActiveTab} /></div>}
-      
+
+      {!openChat && <BottomNav active={activeTab} onChange={setActiveTab} onCreatePost={() => setShowPostModal(true)} />}
+
       <AnimatePresence>
-        {createModalType && <CreateGroupModal type={createModalType} onClose={() => setCreateModalType(null)} onCreated={() => setCreateModalType(null)} />}
-        {viewingProfileId && <UserProfileModal profileId={viewingProfileId} onClose={() => setViewingProfileId(null)} onStartChat={(p) => { setViewingProfileId(null); handleCall(p, 'audio'); }} onCall={(p, t) => { setViewingProfileId(null); handleCall(p, t); }} />}
+        {viewingProfileId && <UserProfileModal profileId={viewingProfileId} onClose={() => setViewingProfileId(null)} />}
+        {showPostModal && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="bg-[#1a1a1a] p-6 rounded-3xl w-full max-w-md border border-white/10"
+            >
+              <h2 className="text-white font-bold mb-4">Новый пост</h2>
+              <textarea value={postText} onChange={e => setPostText(e.target.value)} className="w-full h-32 p-3 bg-[#0f1115] text-white border border-white/10 rounded-xl mb-4 outline-none" />
+              <div className="flex gap-2">
+                <button onClick={() => setShowPostModal(false)} className="flex-1 py-3 bg-white/10 text-white rounded-xl">Отмена</button>
+                <button onClick={handleCreatePost} className="flex-1 py-3 bg-blue-500 text-white rounded-xl">Опубликовать</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
