@@ -12,8 +12,9 @@ import SettingsView from '@/components/SettingsView';
 import UserProfileModal from '@/components/UserProfileModal';
 import SearchView from '@/components/SearchView';
 import FeedView from '@/components/FeedView';
-import CallScreen from '@/components/CallScreen'; // <-- Импорт
+import CallScreen from '@/components/CallScreen';
 import { useCall } from '@/hooks/useCall';
+import { useNotifications } from '@/hooks/useNotifications'; // <-- ИМПОРТ
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
   constructor(props: any) {
@@ -37,15 +38,17 @@ function MessengerApp() {
   const [postText, setPostText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
 
-  // Вытаскиваем состояние звонка
+  // Включаем радар уведомлений
+  useNotifications();
+
   const { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute } = useCall();
-  const [activeCallPeer, setActiveCallPeer] = useState<any>(null); // Чтобы хранить данные собеседника
+  const [activeCallPeer, setActiveCallPeer] = useState<any>(null);
 
   const handleOpenProfile = useCallback((id: string) => setViewingProfileId(id), []);
   const handleOpenChat = useCallback((chatId: string, peer: any) => setOpenChat({ chatId, peer }), []);
 
   const handleStartCall = (peer: any) => {
-    setActiveCallPeer(peer); // Запоминаем кому звоним
+    setActiveCallPeer(peer);
     startCall(peer.id);
   };
 
@@ -64,17 +67,9 @@ function MessengerApp() {
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-black relative">
-      
-      {/* ЭКРАН ЗВОНКА (Появляется поверх всего) */}
       <AnimatePresence>
         {callState !== 'idle' && (
-          <CallScreen 
-            callState={callState} 
-            peer={activeCallPeer || { display_name: 'Собеседник' }} 
-            isMuted={isMuted}
-            toggleMute={toggleMute}
-            endCall={endCall}
-          />
+          <CallScreen callState={callState} peer={activeCallPeer || { display_name: 'Собеседник' }} isMuted={isMuted} toggleMute={toggleMute} endCall={endCall} />
         )}
       </AnimatePresence>
 
@@ -85,7 +80,7 @@ function MessengerApp() {
             peer={openChat.peer} 
             group={null} 
             onBack={() => setOpenChat(null)} 
-            onCall={() => handleStartCall(openChat.peer)} // <-- Передаем объект peer
+            onCall={() => handleStartCall(openChat.peer)} 
             onViewProfile={handleOpenProfile} 
           />
         ) : (
