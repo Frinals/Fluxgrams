@@ -17,15 +17,40 @@ export default function SettingsView({ onViewProfile }: any) {
   const [editUsername, setEditUsername] = useState(profile?.username || '');
   const [isSaving, setIsSaving] = useState(false);
   
+  // Стейты для окошка с ошибкой
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorText, setErrorText] = useState('');
+  
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
 
   const handleSaveProfile = async () => {
     if (!user) return;
     setIsSaving(true);
+
+    // Очищаем юзернейм от лишних символов
+    const cleanUsername = editUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+
+    // ПРОВЕРКА: Не занят ли уже такой юзернейм кем-то другим?
+    const { data: existingUser } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', cleanUsername)
+      .neq('id', user.id) // Исключаем самого себя (чтобы можно было сохранить свой же ник)
+      .maybeSingle();
+
+    if (existingUser) {
+      // Если нашли кого-то с таким ником, показываем окошко
+      setErrorText('Данный юз занят');
+      setShowErrorModal(true);
+      setIsSaving(false);
+      return; // Останавливаем сохранение
+    }
+
+    // Если ник свободен, сохраняем
     await supabase.from('profiles').update({ 
       display_name: editName.trim(), 
-      username: editUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') 
+      username: cleanUsername 
     }).eq('id', user.id);
     
     await refreshProfile();
@@ -64,11 +89,23 @@ export default function SettingsView({ onViewProfile }: any) {
   return (
     <div className="flex flex-col h-full overflow-y-auto" style={{ background: 'var(--app-bg)' }}>
       
+      {/* === ОКОШКО С ОШИБКОЙ (ЮЗ ЗАНЯТ) === */}
+      {showErrorModal && (
+        <div className="fixed inset-0 z-[99999] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="rounded-3xl p-6 w-full max-w-xs text-center border shadow-2xl" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
+            <div className="text-4xl mb-3">⚠️</div>
+            <p className="font-bold text-lg mb-6" style={{ color: 'var(--app-text)' }}>{errorText}</p>
+            <button onClick={() => setShowErrorModal(false)} className="w-full py-3 rounded-xl font-bold text-white" style={{ background: 'var(--app-accent)' }}>
+              Понятно
+            </button>
+          </div>
+        </div>
+      )}
+
       {subPage === 'main' && (
         <div className="p-4 space-y-3 pb-24">
           <h2 className="text-[26px] font-bold mb-4" style={{ color: 'var(--app-text)' }}>Настройки</h2>
           
-          {/* Просто смотрим профиль */}
           <div onClick={() => onViewProfile(profile?.id)} className="rounded-3xl p-5 flex items-center gap-4 mb-4 cursor-pointer border" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
             {profile?.avatar_url ? <img src={profile.avatar_url} className="w-16 h-16 rounded-full object-cover" /> : <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold" style={{ background: 'var(--app-accent)' }}>{profile?.display_name?.[0] || 'U'}</div>}
             <div className="flex-1">
@@ -81,7 +118,6 @@ export default function SettingsView({ onViewProfile }: any) {
             <ChevronRightIcon size={18} color="var(--app-text-muted)" />
           </div>
 
-          {/* Кнопка настройки аккаунта */}
           <button onClick={() => setSubPage('edit_profile')} className="border rounded-2xl w-full p-4 flex items-center gap-3 mb-2" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white" style={{ background: 'var(--app-accent)' }}><UsersIcon size={20} /></div>
             <div className="flex-1 text-left">
@@ -100,7 +136,6 @@ export default function SettingsView({ onViewProfile }: any) {
         </div>
       )}
 
-      {/* ЭКРАН РЕДАКТИРОВАНИЯ ПРОФИЛЯ */}
       {subPage === 'edit_profile' && (
         <div className="p-4 pb-24">
           <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
@@ -141,7 +176,6 @@ export default function SettingsView({ onViewProfile }: any) {
         </div>
       )}
 
-      {/* Заглушки для остальных страниц */}
       {['privacy', 'notifications', 'currency', 'appearance'].includes(subPage) && (
         <div className="p-4 pb-24">
           <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
