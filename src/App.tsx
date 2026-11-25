@@ -38,14 +38,10 @@ function MessengerApp() {
   const handleCreatePost = async () => {
     if (!postText.trim() || !user) return;
     setIsPosting(true);
-    
     await supabase.from('user_posts').insert({ user_id: user.id, content: postText });
-    
     setPostText(''); 
     setShowPostModal(false);
     setIsPosting(false);
-    
-    // После публикации сразу открываем свой профиль, чтобы увидеть пост
     setViewingProfileId(user.id);
   };
 
@@ -72,13 +68,14 @@ function MessengerApp() {
                 onViewProfile={(id: string) => setViewingProfileId(id)}
               />
             )}
-            {activeTab === 'settings' && <SettingsView onViewProfile={(id: string) => setViewingProfileId(id)} />}
+            {activeTab === 'feed' && <FeedView onViewProfile={(id: string) => setViewingProfileId(id)} />}
             {activeTab === 'search' && (
               <SearchView 
                 onOpenChat={(chatId: string, peer: any) => setOpenChat({ chatId, peer })} 
                 onViewProfile={(id: string) => setViewingProfileId(id)} 
               />
             )}
+            {activeTab === 'settings' && <SettingsView onViewProfile={(id: string) => setViewingProfileId(id)} />}
             {activeTab === 'calls' && (
               <div className="h-full flex flex-col items-center justify-center" style={{ color: 'var(--app-text)' }}>
                 <div className="text-6xl mb-4">📞</div>
@@ -128,13 +125,3 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-// Импортируй FeedView
-import FeedView from '@/components/FeedView';
-import BottomNav, { Tab } from '@/components/BottomNav';
-
-// Внутри MessengerApp:
-const [activeTab, setActiveTab] = useState<Tab>('chats');
-
-// Замени рендер табов:
-{activeTab === 'feed' && <FeedView onViewProfile={(id: string) => setViewingProfileId(id)} />}
-// И добавь обработку кнопки "Написать" из поиска
