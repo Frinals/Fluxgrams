@@ -77,46 +77,47 @@ export default function SettingsView({ onViewProfile }: any) {
         </div>
       )}
 
-      {['privacy', 'accounts', 'notifications', 'profile'].includes(subPage) && (
+      {['privacy', 'accounts', 'notifications'].includes(subPage) && (
         <div className="p-4 pb-24">
           <button onClick={() => setSubPage('main')} className="mb-4 text-white flex items-center gap-2"><BackIcon size={22} /> Назад</button>
           <h2 className="text-xl font-bold text-white mb-4 capitalize">{subPage}</h2>
           <p className="text-gray-400 text-sm">Этот раздел в разработке.</p>
         </div>
       )}
+
+      {subPage === 'profile' && (
+        <div className="p-4 pb-24">
+          <button onClick={() => setSubPage('main')} className="mb-4 text-white flex items-center gap-2">
+            <BackIcon size={22} /> Назад
+          </button>
+          <h2 className="text-xl font-bold text-white mb-4">Профиль</h2>
+          <div className="flex items-center gap-3 mb-4">
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} className="w-16 h-16 rounded-full object-cover" />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-xl font-bold text-white">
+                {profile?.display_name?.[0] || 'U'}
+              </div>
+            )}
+            <div>
+              <div className="font-semibold flex items-center gap-1 text-white">
+                {profile?.display_name || 'User'}
+                {(profile as any)?.is_verified && <VerifiedIcon size={16} />}
+              </div>
+              <div className="text-sm text-gray-400">@{profile?.username}</div>
+            </div>
+          </div>
+          <button
+            onClick={() => onViewProfile?.(profile?.id)}
+            className="w-full py-3 bg-blue-500 rounded-xl font-semibold mb-2 text-white"
+          >
+            Просмотреть профиль
+          </button>
+          <button className="w-full py-3 bg-white/10 rounded-xl font-semibold text-white">
+            Настроить профиль
+          </button>
+        </div>
+      )}
     </div>
   );
 }
-{subPage === 'profile' && (
-  <div className="p-4">
-    <button onClick={() => setSubPage('main')} className="mb-4 text-white flex items-center gap-2">
-      <BackIcon /> Назад
-    </button>
-    <h2 className="text-xl font-bold mb-4">Профиль</h2>
-    <div className="flex items-center gap-3 mb-4">
-      {profile?.avatar_url ? (
-        <img src={profile.avatar_url} className="w-16 h-16 rounded-full" />
-      ) : (
-        <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-xl font-bold">
-          {profile?.display_name?.[0] || 'U'}
-        </div>
-      )}
-      <div>
-        <div className="font-semibold flex items-center gap-1">
-          {profile?.display_name || 'User'}
-          {profile?.is_verified && <VerifiedIcon className="w-4 h-4 text-blue-400" />}
-        </div>
-        <div className="text-sm text-gray-400">@{profile?.username}</div>
-      </div>
-    </div>
-    <button
-      onClick={() => onViewProfile?.(profile?.id)}
-      className="w-full py-3 bg-blue-500 rounded-xl font-semibold mb-2"
-    >
-      Просмотреть профиль
-    </button>
-    <button className="w-full py-3 bg-white/10 rounded-xl font-semibold">
-      Настроить профиль
-    </button>
-  </div>
-)}
