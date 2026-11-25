@@ -147,3 +147,19 @@ body {
 body {
   overscroll-behavior-y: none;
 }
+/* Снег для Нового года */
+.snowflakes { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; }
+.snowflake { position: absolute; top: -10px; color: white; opacity: 0.7; font-size: 1.5em; animation: fall linear infinite; }
+@keyframes fall { to { transform: translateY(100vh); } }
+.snowflake:nth-child(1) { left: 10%; animation-duration: 5s; }
+.snowflake:nth-child(2) { left: 20%; animation-duration: 7s; }
+.snowflake:nth-child(3) { left: 30%; animation-duration: 6s; }
+.snowflake:nth-child(4) { left: 40%; animation-duration: 8s; }
+.snowflake:nth-child(5) { left: 50%; animation-duration: 5s; }
+.snowflake:nth-child(6) { left: 60%; animation-duration: 9s; }
+.snowflake:nth-child(7) { left: 70%; animation-duration: 6s; }
+.snowflake:nth-child(8) { left: 80%; animation-duration: 4s; }
+.snowflake:nth-child(9) { left: 90%; animation-duration: 7s; }
+
+/* Паутина для Хэллоуина */
+.spiderweb { position: fixed; top: 0; right: 0; font-size: 8rem; opacity: 0.3; pointer-events: none; z-index: 0; }
