@@ -28,19 +28,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (uid: string) => {
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
-      if (!error && data) {
-        setProfile(data as Profile);
-      }
+      if (!error && data) setProfile(data as Profile);
     } catch (err) {
-      console.error("Ошибка загрузки профиля", err);
+      console.error("Ошибка профиля:", err);
     }
   };
 
   useEffect(() => {
     let isMounted = true;
-
+    
+    // Аварийный таймер, чтобы приложение не висело вечно
     const timer = setTimeout(() => {
-      if (isMounted && loading) setLoading(false);
+      if (isMounted) setLoading(false);
     }, 5000);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -48,14 +47,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id).finally(() => {
-          setLoading(false);
-          clearTimeout(timer);
-        });
-      } else {
-        setLoading(false);
-        clearTimeout(timer);
+        if (!session.user.email_confirmed_at) {
+          setNeedsEmailVerification(true);
+        } else {
+          fetchProfile(session.user.id);
+        }
       }
+      setLoading(false);
+      clearTimeout(timer);
+    }).catch(() => {
+      if (isMounted) setLoading(false);
+      clearTimeout(timer);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -66,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fetchProfile(session.user.id);
       } else {
         setProfile(null);
+        setNeedsEmailVerification(false);
       }
       setLoading(false);
     });
@@ -75,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(timer);
       listener.subscription.unsubscribe();
     };
-  }, []); // Убрали зависимость от loading, чтобы не было зацикливания
+  }, []);
 
   const refreshProfile = async () => {
     if (user) await fetchProfile(user.id);
@@ -84,6 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
+    if (data.user && !data.user.email_confirmed_at) {
+      setNeedsEmailVerification(true);
+      return { error: null, needsVerification: true };
+    }
     return { error: null };
   };
 
@@ -110,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setProfile(null);
     setUser(null);
+    setSession(null);
   };
 
   return (
