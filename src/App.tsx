@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
@@ -58,40 +58,14 @@ function MessengerApp() {
     <div className="h-screen flex flex-col bg-[#0f1115]">
       <div className="flex-1 relative overflow-hidden">
         {openChat ? (
-          <ChatView 
-            chatId={openChat.chatId} 
-            peer={openChat.peer} 
-            group={null} 
-            onBack={() => setOpenChat(null)} 
-            onCall={() => alert('Звонки в разработке')} 
-          />
+          <ChatView chatId={openChat.chatId} peer={openChat.peer} group={null} onBack={() => setOpenChat(null)} onCall={() => alert('Звонки в разработке')} />
         ) : (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="absolute inset-0"
-            >
-              {activeTab === 'chats' && (
-                <ChatList 
-                  onOpenChat={(chatId: string, peer: any) => setOpenChat({ chatId, peer })} 
-                  onOpenGroup={() => {}} 
-                />
-              )}
-              {activeTab === 'settings' && (
-                <SettingsView onViewProfile={(id: string) => setViewingProfileId(id)} />
-              )}
-              {activeTab === 'search' && (
-                <div className="p-4 text-white">Поиск в разработке</div>
-              )}
-              {activeTab === 'calls' && (
-                <div className="p-4 text-white">Звонки в разработке</div>
-              )}
-            </motion.div>
-          </AnimatePresence>
+          <>
+            {activeTab === 'chats' && <ChatList onOpenChat={(chatId: string, peer: any) => setOpenChat({ chatId, peer })} onOpenGroup={() => {}} />}
+            {activeTab === 'settings' && <SettingsView onViewProfile={(id: string) => setViewingProfileId(id)} />}
+            {activeTab === 'search' && <div className="p-4 text-white">Поиск в разработке</div>}
+            {activeTab === 'calls' && <div className="p-4 text-white">Звонки в разработке</div>}
+          </>
         )}
       </div>
 
@@ -100,27 +74,16 @@ function MessengerApp() {
       <AnimatePresence>
         {viewingProfileId && <UserProfileModal profileId={viewingProfileId} onClose={() => setViewingProfileId(null)} />}
         {showPostModal && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4"
-          >
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ duration: 0.2 }}
-              className="bg-[#1a1a1a] p-6 rounded-3xl w-full max-w-md border border-white/10"
-            >
+          <div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4">
+            <div className="bg-[#1a1a1a] p-6 rounded-3xl w-full max-w-md border border-white/10">
               <h2 className="text-white font-bold mb-4">Новый пост</h2>
               <textarea value={postText} onChange={e => setPostText(e.target.value)} className="w-full h-32 p-3 bg-[#0f1115] text-white border border-white/10 rounded-xl mb-4 outline-none" />
               <div className="flex gap-2">
                 <button onClick={() => setShowPostModal(false)} className="flex-1 py-3 bg-white/10 text-white rounded-xl">Отмена</button>
                 <button onClick={handleCreatePost} className="flex-1 py-3 bg-blue-500 text-white rounded-xl">Опубликовать</button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
       </AnimatePresence>
     </div>
