@@ -1,21 +1,37 @@
 import React, { useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { supabase } from '@/lib/supabase';
 import AuthScreen from '@/components/AuthScreen';
 import BottomNav, { Tab } from '@/components/BottomNav';
 import ChatList from '@/components/ChatList';
 import ChatView from '@/components/ChatView';
 import SettingsView from '@/components/SettingsView';
 import UserProfileModal from '@/components/UserProfileModal';
-import SearchView from '@/components/SearchView'; // <-- Наш новый поиск
+import FeedView from '@/components/FeedView'; // <-- Импортируем ленту
 
 function MessengerApp() {
   const { user, loading, needsEmailVerification } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('chats');
   const [openChat, setOpenChat] = useState<any>(null);
   const [viewingProfileId, setViewingProfileId] = useState<string | null>(null);
+  
+  // Состояния для создания поста
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [postText, setPostText] = useState('');
+  const [isPosting, setIsPosting] = useState(false);
+
+  const handleCreatePost = async () => {
+    if (!postText.trim() || !user) return;
+    setIsPosting(true);
+    await supabase.from('user_posts').insert({ user_id: user.id, content: postText });
+    setPostText(''); 
+    setShowPostModal(false);
+    setIsPosting(false);
+    setActiveTab('search'); // Перекидываем на ленту после публикации
+  };
 
   if (loading) return <div className="h-[100dvh] flex items-center justify-center font-bold" style={{ background: 'var(--app-bg)', color: 'var(--app-text)' }}>Загрузка...</div>;
   if (!user || needsEmailVerification) return <AuthScreen />;
@@ -30,7 +46,7 @@ function MessengerApp() {
             group={null} 
             onBack={() => setOpenChat(null)} 
             onCall={() => alert('Звонки в разработке')} 
-            onViewProfile={(id: string) => setViewingProfileId(id)} // <-- Передаем открытие профиля
+            onViewProfile={(id: string) => setViewingProfileId(id)} 
           />
         ) : (
           <>
@@ -42,12 +58,9 @@ function MessengerApp() {
             )}
             {activeTab === 'settings' && <SettingsView onViewProfile={(id: string) => setViewingProfileId(id)} />}
             
-            {/* Наш рабочий поиск */}
+            {/* Вкладка поиска временно показывает ленту постов */}
             {activeTab === 'search' && (
-              <SearchView 
-                onOpenChat={(chatId: string, peer: any) => setOpenChat({ chatId, peer })} 
-                onViewProfile={(id: string) => setViewingProfileId(id)}
-              />
+              <FeedView onViewProfile={(id: string) => setViewingProfileId(id)} />
             )}
             
             {activeTab === 'calls' && (
@@ -60,10 +73,54 @@ function MessengerApp() {
         )}
       </div>
 
-      {!openChat && <BottomNav active={activeTab} onChange={setActiveTab} onCreatePost={() => {}} />}
+      {!openChat && <BottomNav active={activeTab} onChange={setActiveTab} onCreatePost={() => setShowPostModal(true)} />}
 
       <AnimatePresence>
         {viewingProfileId && <UserProfileModal profileId={viewingProfileId} onClose={() => setViewingProfileId(null)} />}
+      </AnimatePresence>
+
+      {/* Модалка создания поста */}
+      <AnimatePresence>
+        {showPostModal && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
+            className="fixed inset-0 z-[999] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm"
+            onClick={() => setShowPostModal(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="rounded-3xl p-5 w-full max-w-md border shadow-2xl" 
+              style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <h2 className="font-bold text-xl mb-4" style={{ color: 'var(--app-text)' }}>Новый пост</h2>
+              <textarea 
+                value={postText} 
+                onChange={e => setPostText(e.target.value)} 
+                placeholder="О чем думаешь?" 
+                className="w-full h-32 p-4 rounded-2xl outline-none resize-none border text-[16px]" 
+                style={{ background: 'var(--app-bg)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }}
+              />
+              <div className="flex gap-3 mt-4">
+                <button 
+                  onClick={() => setShowPostModal(false)} 
+                  className="flex-1 py-3 rounded-2xl font-semibold"
+                  style={{ background: 'var(--app-bg)', color: 'var(--app-text)' }}
+                >
+                  Отмена
+                </button>
+                <button 
+                  onClick={handleCreatePost} 
+                  disabled={isPosting || !postText.trim()}
+                  className="flex-1 py-3 rounded-2xl font-semibold text-white disabled:opacity-50"
+                  style={{ background: 'var(--app-accent)' }}
+                >
+                  {isPosting ? 'Публикация...' : 'Опубликовать'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
