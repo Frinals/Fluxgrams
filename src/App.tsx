@@ -56,7 +56,13 @@ function MessengerApp() {
     </div>
   );
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-[#0f1115] text-white">Загрузка...</div>;
+  // Явный текст загрузки вместо темного квадрата
+  if (loading) return (
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f1115', color: 'white', fontSize: '24px', fontWeight: 'bold' }}>
+      Загрузка данных...
+    </div>
+  );
+
   if (!user || needsEmailVerification) return <AuthScreen />;
 
   return (
