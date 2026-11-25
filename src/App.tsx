@@ -3,19 +3,23 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
-import { supabase } from '@/lib/supabase';
+import { supabase, Profile, Group } from '@/lib/supabase';
 import AuthScreen from '@/components/AuthScreen';
 import BottomNav, { Tab } from '@/components/BottomNav';
 import ChatList from '@/components/ChatList';
 import ChatView from '@/components/ChatView';
+import CallsView from '@/components/CallsView';
+import SearchView from '@/components/SearchView';
 import SettingsView from '@/components/SettingsView';
+import IncomingCallModal from '@/components/IncomingCallModal';
+import OutgoingCallModal from '@/components/OutgoingCallModal';
 import UserProfileModal from '@/components/UserProfileModal';
 
-class ErrorBoundary extends React.Component<any, any> {
-  state = { hasError: false, error: null };
-  static getDerivedStateFromError(error: any) { return { hasError: true, error }; }
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
+  constructor(props: any) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
   render() {
-    if (this.state.hasError) return <div style={{ padding: 20, background: 'red', color: 'white', minHeight: '100vh' }}><h1>Ошибка!</h1><p>{this.state.error.message}</p></div>;
+    if (this.state.hasError) return <div style={{ padding: 20, background: 'red', color: 'white', minHeight: '100vh' }}><h1>Ошибка!</h1><p>{this.state.error?.message}</p></div>;
     return this.props.children;
   }
 }
@@ -23,10 +27,12 @@ class ErrorBoundary extends React.Component<any, any> {
 function MessengerApp() {
   const { user, loading, needsEmailVerification } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('chats');
-  const [openChat, setOpenChat] = useState<any>(null);
+  const [openChat, setOpenChat] = useState<any | null>(null);
+  const [openGroup, setOpenGroup] = useState<Group | null>(null);
+  const [outgoingCall, setOutgoingCall] = useState<any | null>(null);
   const [viewingProfileId, setViewingProfileId] = useState<string | null>(null);
-  const [isMaintenance, setIsMaintenance] = useState(false);
   
+  const [isMaintenance, setIsMaintenance] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
   const [postText, setPostText] = useState('');
 
@@ -38,86 +44,72 @@ function MessengerApp() {
     check();
   }, []);
 
+  const handleCall = async (peer: Profile, callType: 'audio' | 'video') => {
+    if (!user) return;
+    const { data: chatId } = await supabase.rpc('create_chat_with_participants', { peer_id: peer.id });
+    if (chatId) setOutgoingCall({ peer, callType, chatId });
+  };
+
   const handleCreatePost = async () => {
     if (!postText.trim() || !user) return;
     await supabase.from('user_posts').insert({ user_id: user.id, content: postText });
-    setPostText(''); setShowPostModal(false); alert('Пост опубликован!');
+    setPostText('');
+    setShowPostModal(false);
+    alert('Пост опубликован!');
   };
 
   if (isMaintenance) return (
     <div className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[#0f1115] p-6 text-center">
-      <div className="text-6xl mb-6">🛠️</div><h1 className="text-3xl font-bold text-white mb-2">Технические работы</h1>
+      <div className="text-6xl mb-6">🛠️</div>
+      <h1 className="text-3xl font-bold text-white mb-2">Технические работы</h1>
       <button onClick={() => window.location.href = 'about:blank'} className="mt-8 px-8 py-3 bg-red-500 text-white font-bold rounded-xl">Выйти</button>
     </div>
   );
 
-  if (loading) return <div className="h-screen bg-[#0f1115]" />;
+  if (loading) return <div className="min-h-screen bg-[#0f1115]" />;
   if (!user || needsEmailVerification) return <AuthScreen />;
 
   return (
-    <div className="h-screen flex flex-col bg-[#0f1115]">
-      <div className="flex-1 relative overflow-hidden">
-        {openChat ? (
-          <ChatView 
-            chatId={openChat.chatId} 
-            peer={openChat.peer} 
-            group={null} 
-            onBack={() => setOpenChat(null)} 
-            onCall={() => alert('Звонки в разработке')} 
-          />
-        ) : (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="absolute inset-0"
-            >
-              {activeTab === 'chats' && (
-                <ChatList 
-                  onOpenChat={(chatId: string, peer: any) => setOpenChat({ chatId, peer })} 
-                  onOpenGroup={() => {}} 
-                />
-              )}
-              {activeTab === 'settings' && (
-                <SettingsView onViewProfile={(id: string) => setViewingProfileId(id)} />
-              )}
-              {activeTab === 'search' && (
-                <div className="p-4 text-white">Поиск в разработке</div>
-              )}
-              {activeTab === 'calls' && (
-                <div className="p-4 text-white">Звонки в разработке</div>
-              )}
+    <div className="h-screen flex flex-col relative overflow-hidden bg-[#0f1115]">
+      <IncomingCallModal />
+      {outgoingCall && <OutgoingCallModal peer={outgoingCall.peer} callType={outgoingCall.callType} chatId={outgoingCall.chatId} onCancel={() => setOutgoingCall(null)} />}
+
+      <div className="flex-1 overflow-hidden relative">
+        <AnimatePresence mode="wait">
+          {openChat ? (
+            <motion.div key="chat" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full absolute inset-0">
+              <ChatView chatId={openChat.chatId} peer={openChat.peer} group={null} onBack={() => setOpenChat(null)} onCall={handleCall} />
             </motion.div>
-          </AnimatePresence>
-        )}
+          ) : openGroup ? (
+            <motion.div key="group" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="h-full absolute inset-0">
+              <ChatView chatId={null} peer={{}} group={openGroup} onBack={() => setOpenGroup(null)} onCall={handleCall} />
+            </motion.div>
+          ) : (
+            <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full absolute inset-0">
+              {activeTab === 'chats' && <ChatList onOpenChat={(chatId, peer) => setOpenChat({ chatId, peer })} onOpenGroup={setOpenGroup} />}
+              {activeTab === 'search' && <SearchView onOpenChat={(chatId, peer) => setOpenChat({ chatId, peer })} onOpenGroup={setOpenGroup} onViewProfile={(p) => setViewingProfileId(p.id)} />}
+              {activeTab === 'calls' && <CallsView />}
+              {activeTab === 'settings' && <SettingsView onViewProfile={(id) => setViewingProfileId(id)} />}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {!openChat && <BottomNav active={activeTab} onChange={setActiveTab} onCreatePost={() => setShowPostModal(true)} />}
+      {!openChat && !openGroup && (
+        <BottomNav active={activeTab} onChange={setActiveTab} onCreatePost={() => setShowPostModal(true)} />
+      )}
 
       <AnimatePresence>
         {viewingProfileId && <UserProfileModal profileId={viewingProfileId} onClose={() => setViewingProfileId(null)} />}
+        
         {showPostModal && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4"
-          >
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ duration: 0.2 }}
-              className="bg-[#1a1a1a] p-6 rounded-3xl w-full max-w-md border border-white/10"
-            >
-              <h2 className="text-white font-bold mb-4">Новый пост</h2>
-              <textarea value={postText} onChange={e => setPostText(e.target.value)} className="w-full h-32 p-3 bg-[#0f1115] text-white border border-white/10 rounded-xl mb-4 outline-none" />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div initial={{ y: 50 }} animate={{ y: 0 }} className="w-full max-w-md bg-[#1a1a1a] p-6 rounded-3xl border border-white/10 shadow-2xl">
+              <h2 className="text-xl font-bold text-white mb-4">Новый пост</h2>
+              <textarea value={postText} onChange={e => setPostText(e.target.value)} placeholder="Что у вас нового?" className="w-full h-32 p-3 bg-black/20 border border-white/10 rounded-xl text-white outline-none mb-4 resize-none" />
               <div className="flex gap-2">
-                <button onClick={() => setShowPostModal(false)} className="flex-1 py-3 bg-white/10 text-white rounded-xl">Отмена</button>
-                <button onClick={handleCreatePost} className="flex-1 py-3 bg-blue-500 text-white rounded-xl">Опубликовать</button>
+                <button onClick={() => setShowPostModal(false)} className="flex-1 py-3 rounded-xl bg-white/10 text-white font-medium">Отмена</button>
+                <button onClick={handleCreatePost} className="flex-1 py-3 rounded-xl bg-blue-500 text-white font-bold">Опубликовать</button>
               </div>
             </motion.div>
           </motion.div>
@@ -133,4 +125,4 @@ export default function App() {
       <ThemeProvider><LanguageProvider><AuthProvider><MessengerApp /></AuthProvider></LanguageProvider></ThemeProvider>
     </ErrorBoundary>
   );
-}
+            }
