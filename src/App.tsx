@@ -10,7 +10,7 @@ import ChatList from '@/components/ChatList';
 import ChatView from '@/components/ChatView';
 import SettingsView from '@/components/SettingsView';
 import UserProfileModal from '@/components/UserProfileModal';
-import FeedView from '@/components/FeedView';
+import SearchView from '@/components/SearchView'; // <-- Вернули поиск
 
 function MessengerApp() {
   const { user, loading, needsEmailVerification } = useAuth();
@@ -23,8 +23,14 @@ function MessengerApp() {
 
   const handleCreatePost = async () => {
     if (!postText.trim() || !user) return;
+    
+    // Создаем пост
     await supabase.from('user_posts').insert({ user_id: user.id, content: postText });
-    setPostText(''); setShowPostModal(false); setActiveTab('search');
+    setPostText(''); 
+    setShowPostModal(false);
+    
+    // Перекидываем сразу в свой профиль, чтобы увидеть пост
+    setViewingProfileId(user.id);
   };
 
   if (loading) return <div className="h-[100dvh] flex items-center justify-center font-bold" style={{ background: 'var(--app-bg)', color: 'var(--app-text)' }}>Загрузка...</div>;
@@ -51,7 +57,15 @@ function MessengerApp() {
               />
             )}
             {activeTab === 'settings' && <SettingsView onViewProfile={(id: string) => setViewingProfileId(id)} />}
-            {activeTab === 'search' && <FeedView onViewProfile={(id: string) => setViewingProfileId(id)} />}
+            
+            {/* Теперь Поиск занимается только поиском людей */}
+            {activeTab === 'search' && (
+              <SearchView 
+                onOpenChat={(chatId: string, peer: any) => setOpenChat({ chatId, peer })} 
+                onViewProfile={(id: string) => setViewingProfileId(id)} 
+              />
+            )}
+            
             {activeTab === 'calls' && (
               <div className="h-full flex flex-col items-center justify-center" style={{ color: 'var(--app-text)' }}>
                 <div className="text-6xl mb-4">📞</div>
@@ -64,7 +78,6 @@ function MessengerApp() {
 
       {!openChat && <BottomNav active={activeTab} onChange={setActiveTab} onCreatePost={() => setShowPostModal(true)} />}
 
-      {/* Модалка профиля с анимацией */}
       <AnimatePresence>
         {viewingProfileId && <UserProfileModal profileId={viewingProfileId} onClose={() => setViewingProfileId(null)} />}
       </AnimatePresence>
