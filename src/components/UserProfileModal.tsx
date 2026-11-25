@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { PlayIcon, PauseIcon, VerifiedIcon, XIcon, HeartIcon, EyeIcon } from '@/components/Icons';
+import { PlayIcon, PauseIcon, VerifiedIcon, XIcon } from '@/components/Icons'; // Убрал HeartIcon, EyeIcon
 
 export default function UserProfileModal({ profileId, onClose }: any) {
   const { user } = useAuth();
@@ -19,11 +19,9 @@ export default function UserProfileModal({ profileId, onClose }: any) {
   useEffect(() => {
     if (!profileId) return;
     const fetchData = async () => {
-      // Загружаем профиль
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', profileId).single();
       if (profileData) setProfile(profileData);
       
-      // Загружаем посты этого пользователя
       const { data: postsData } = await supabase.from('user_posts').select('*').eq('user_id', profileId).order('created_at', { ascending: false });
       if (postsData) setUserPosts(postsData);
       
@@ -85,7 +83,6 @@ export default function UserProfileModal({ profileId, onClose }: any) {
             <p className="text-sm py-3 px-4 rounded-2xl border" style={{ color: 'var(--app-text)', background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>{profile?.bio || 'Пользователь пока ничего не рассказал о себе.'}</p>
           </div>
 
-          {/* Музыка */}
           <div className="w-full max-w-md mt-6">
             <h3 className="font-bold text-lg mb-3" style={{ color: 'var(--app-text)' }}>Музыка</h3>
             <div className="rounded-2xl overflow-hidden border" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
@@ -107,7 +104,6 @@ export default function UserProfileModal({ profileId, onClose }: any) {
             <audio ref={audioRef} onEnded={() => setIsPlaying(false)} className="hidden" />
           </div>
 
-          {/* ВКЛАДКИ: Посты и Подарки */}
           <div className="w-full max-w-md mt-8">
             <div className="flex border-b" style={{ borderColor: 'var(--app-border)' }}>
               <button onClick={() => setActiveTab('posts')} className="flex-1 py-3 font-semibold text-center transition-colors" style={{ color: activeTab === 'posts' ? 'var(--app-accent)' : 'var(--app-text-muted)', borderBottom: activeTab === 'posts' ? '2px solid var(--app-accent)' : 'none' }}>
@@ -127,9 +123,10 @@ export default function UserProfileModal({ profileId, onClose }: any) {
                     userPosts.map(post => (
                       <div key={post.id} className="p-4 rounded-2xl border" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
                         <p className="text-[15px] mb-3" style={{ color: 'var(--app-text)' }}>{post.content}</p>
+                        {/* ИСПОЛЬЗУЕМ ЭМОДЗИ ВМЕСТО ИКОНОК */}
                         <div className="flex items-center gap-4 text-sm" style={{ color: 'var(--app-text-muted)' }}>
-                          <span className="flex items-center gap-1"><HeartIcon size={16} /> {post.likes || 0}</span>
-                          <span className="flex items-center gap-1"><EyeIcon size={16} /> {post.views || 0}</span>
+                          <span className="flex items-center gap-1">❤️ {post.likes || 0}</span>
+                          <span className="flex items-center gap-1">👁️ {post.views || 0}</span>
                         </div>
                       </div>
                     ))
