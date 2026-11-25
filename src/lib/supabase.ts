@@ -16,7 +16,9 @@ export interface Profile {
   privacy_messages: string;
   privacy_calls: string;
   created_at: string;
-  is_verified?: boolean; // <-- ВОТ ТУТ ДОБАВИЛИ ГАЛОЧКУ
+  is_verified?: boolean;
+  banner_url?: string | null; // НОВОЕ
+  profile_music?: any[] | null; // НОВОЕ
 }
 
 export interface Chat { id: string; created_at: string; }
