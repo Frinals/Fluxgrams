@@ -1,13 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
-import { themes, themeList } from '@/lib/types'; // Убедись что темы добавлены в types
+import { themes, useTheme } from '@/contexts/ThemeContext'; // ИСПРАВЛЕННЫЙ ИМПОРТ
 import { supabase } from '@/lib/supabase';
 import { BackIcon, ImageIcon, PlayIcon, VerifiedIcon } from '@/components/Icons';
 import MusicPlayer from './MusicPlayer';
 import { AnimatePresence } from 'framer-motion';
 
-type SubPage = 'main' | 'edit_profile' | 'appearance' | 'notifications' | 'privacy' | 'currency';
+type SubPage = 'main' | 'edit_profile' | 'appearance';
 
 export default function SettingsView({ onViewProfile }: any) {
   const { user, profile, refreshProfile, signOut } = useAuth();
@@ -21,7 +20,6 @@ export default function SettingsView({ onViewProfile }: any) {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorText, setErrorText] = useState('');
 
-  // Для плеера
   const [showPlayer, setShowPlayer] = useState(false);
   const [playerIndex, setPlayerIndex] = useState(0);
   
@@ -53,7 +51,7 @@ export default function SettingsView({ onViewProfile }: any) {
     }).eq('id', user.id);
 
     if (error) {
-      setErrorText(error.code === '23505' ? 'Данный юз занят' : 'Ошибка сохранения: ' + error.message);
+      setErrorText(error.code === '23505' ? 'Данный юз занят' : 'Ошибка: ' + error.message);
       setShowErrorModal(true);
     } else {
       await refreshProfile();
@@ -96,7 +94,6 @@ export default function SettingsView({ onViewProfile }: any) {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto" style={{ background: 'var(--app-bg)' }}>
-      
       {showErrorModal && (
         <div className="fixed inset-0 z-[99999] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="rounded-3xl p-6 w-full max-w-xs text-center border shadow-2xl" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
@@ -107,10 +104,8 @@ export default function SettingsView({ onViewProfile }: any) {
         </div>
       )}
 
-      {/* ГЛАВНЫЙ ЭКРАН НАСТРОЕК (КАК НА ФОТО) */}
       {subPage === 'main' && (
         <div className="pb-24">
-          {/* Баннер и Аватар */}
           <div className="relative w-full h-48" style={{ background: 'var(--app-accent)' }}>
              {profile?.banner_url && <img src={profile.banner_url} className="w-full h-full object-cover" />}
              <button onClick={() => bannerInputRef.current?.click()} className="absolute top-4 right-4 p-2 bg-black/40 text-white rounded-full backdrop-blur-md">
@@ -139,7 +134,6 @@ export default function SettingsView({ onViewProfile }: any) {
               <p className="text-sm mt-1 text-green-500">В сети</p>
             </div>
 
-            {/* 4 кнопки */}
             <div className="grid grid-cols-4 gap-2 w-full max-w-md mt-6">
               <button onClick={() => avatarInputRef.current?.click()} className="flex flex-col items-center p-3 rounded-2xl border" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
                 <span className="text-xl mb-1">📷</span><span className="text-xs" style={{ color: 'var(--app-text)' }}>Фото</span>
@@ -155,7 +149,6 @@ export default function SettingsView({ onViewProfile }: any) {
               </button>
             </div>
 
-            {/* Музыка */}
             <div className="w-full max-w-md mt-6">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="font-bold text-lg" style={{ color: 'var(--app-text)' }}>Музыка</h3>
@@ -187,7 +180,6 @@ export default function SettingsView({ onViewProfile }: any) {
         </div>
       )}
 
-      {/* РЕДАКТИРОВАНИЕ ИМЕНИ/ЮЗА */}
       {subPage === 'edit_profile' && (
         <div className="p-4 pb-24">
           <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
@@ -206,15 +198,14 @@ export default function SettingsView({ onViewProfile }: any) {
         </div>
       )}
 
-      {/* ТЕМЫ */}
       {subPage === 'appearance' && (
         <div className="p-4 pb-24">
           <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
           <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--app-text)' }}>Оформление</h2>
           <div className="grid grid-cols-3 gap-3">
-             {['pitch_black', 'light', 'new_year', 'halloween', 'cyberpunk', 'dark'].map((key: any) => (
+             {(['pitch_black', 'light', 'new_year', 'halloween', 'cyberpunk', 'dark'] as const).map((key) => (
                 <button key={key} onClick={() => setTheme(key)} className="p-3 rounded-xl border flex flex-col items-center gap-2" style={{ background: theme === key ? 'var(--app-surface)' : 'transparent', borderColor: theme === key ? 'var(--app-accent)' : 'var(--app-border)' }}>
-                  <div className="w-10 h-10 rounded-full border border-white/20" style={{ background: themes[key as keyof typeof themes]?.accent || '#333' }} />
+                  <div className="w-10 h-10 rounded-full border border-white/20" style={{ background: themes[key]?.accent || '#333' }} />
                   <span className="text-xs text-center" style={{ color: 'var(--app-text)' }}>{key.replace('_', ' ')}</span>
                 </button>
              ))}
@@ -222,13 +213,11 @@ export default function SettingsView({ onViewProfile }: any) {
         </div>
       )}
 
-      {/* ПЛЕЕР */}
       <AnimatePresence>
         {showPlayer && profile?.profile_music && (
           <MusicPlayer songs={profile.profile_music} initialIndex={playerIndex} onClose={() => setShowPlayer(false)} />
         )}
       </AnimatePresence>
-
     </div>
   );
 }
