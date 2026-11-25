@@ -5,7 +5,20 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export interface Profile { id: string; username: string | null; display_name: string | null; avatar_url: string | null; bio: string | null; profile_song_url: string | null; ghost_mode: boolean; privacy_messages: string; privacy_calls: string; created_at: string; }
+export interface Profile {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  profile_song_url: string | null;
+  ghost_mode: boolean;
+  privacy_messages: string;
+  privacy_calls: string;
+  created_at: string;
+  is_verified?: boolean; // <-- ВОТ ТУТ ДОБАВИЛИ ГАЛОЧКУ
+}
+
 export interface Chat { id: string; created_at: string; }
 export interface ChatParticipant { id: string; chat_id: string; user_id: string; last_read_at: string; }
 export interface Message { id: string; chat_id: string; group_id: string | null; sender_id: string; content: string | null; media_url: string | null; media_type: string | null; disappearing: boolean; expires_at: string | null; created_at: string; }
