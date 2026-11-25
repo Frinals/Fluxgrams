@@ -10,7 +10,20 @@ import ChatList from '@/components/ChatList';
 import ChatView from '@/components/ChatView';
 import SettingsView from '@/components/SettingsView';
 import UserProfileModal from '@/components/UserProfileModal';
-import SearchView from '@/components/SearchView'; // <-- Вернули поиск
+import SearchView from '@/components/SearchView';
+import FeedView from '@/components/FeedView';
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) return <div style={{ padding: 20, background: 'red', color: 'white', minHeight: '100vh' }}><h1>Ошибка!</h1><p>{this.state.error?.message}</p></div>;
+    return this.props.children;
+  }
+}
 
 function MessengerApp() {
   const { user, loading, needsEmailVerification } = useAuth();
@@ -20,16 +33,19 @@ function MessengerApp() {
   
   const [showPostModal, setShowPostModal] = useState(false);
   const [postText, setPostText] = useState('');
+  const [isPosting, setIsPosting] = useState(false);
 
   const handleCreatePost = async () => {
     if (!postText.trim() || !user) return;
+    setIsPosting(true);
     
-    // Создаем пост
     await supabase.from('user_posts').insert({ user_id: user.id, content: postText });
+    
     setPostText(''); 
     setShowPostModal(false);
+    setIsPosting(false);
     
-    // Перекидываем сразу в свой профиль, чтобы увидеть пост
+    // После публикации сразу открываем свой профиль, чтобы увидеть пост
     setViewingProfileId(user.id);
   };
 
@@ -57,15 +73,12 @@ function MessengerApp() {
               />
             )}
             {activeTab === 'settings' && <SettingsView onViewProfile={(id: string) => setViewingProfileId(id)} />}
-            
-            {/* Теперь Поиск занимается только поиском людей */}
             {activeTab === 'search' && (
               <SearchView 
                 onOpenChat={(chatId: string, peer: any) => setOpenChat({ chatId, peer })} 
                 onViewProfile={(id: string) => setViewingProfileId(id)} 
               />
             )}
-            
             {activeTab === 'calls' && (
               <div className="h-full flex flex-col items-center justify-center" style={{ color: 'var(--app-text)' }}>
                 <div className="text-6xl mb-4">📞</div>
@@ -90,7 +103,9 @@ function MessengerApp() {
               <textarea value={postText} onChange={e => setPostText(e.target.value)} placeholder="О чем думаешь?" className="w-full h-32 p-4 rounded-2xl outline-none resize-none border text-[16px]" style={{ background: 'var(--app-bg)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
               <div className="flex gap-3 mt-4">
                 <button onClick={() => setShowPostModal(false)} className="flex-1 py-3 rounded-2xl font-semibold" style={{ background: 'var(--app-bg)', color: 'var(--app-text)' }}>Отмена</button>
-                <button onClick={handleCreatePost} disabled={!postText.trim()} className="flex-1 py-3 rounded-2xl font-semibold text-white disabled:opacity-50" style={{ background: 'var(--app-accent)' }}>Опубликовать</button>
+                <button onClick={handleCreatePost} disabled={isPosting || !postText.trim()} className="flex-1 py-3 rounded-2xl font-semibold text-white disabled:opacity-50" style={{ background: 'var(--app-accent)' }}>
+                  {isPosting ? 'Публикация...' : 'Опубликовать'}
+                </button>
               </div>
             </motion.div>
           </motion.div>
@@ -102,12 +117,14 @@ function MessengerApp() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <AuthProvider>
-          <MessengerApp />
-        </AuthProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <MessengerApp />
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
