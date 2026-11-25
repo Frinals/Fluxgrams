@@ -1,18 +1,32 @@
 import { motion } from 'framer-motion';
-import { ChatIcon, PhoneIcon, SettingsIcon, SearchIcon, PlusIcon } from '@/components/Icons';
+import { ChatIcon, PhoneIcon, SearchIcon, SettingsIcon, PlusIcon } from '@/components/Icons'; // Добавь FeedIcon если есть, иначе эмодзи
 
-export type Tab = 'chats' | 'search' | 'calls' | 'settings';
+export type Tab = 'chats' | 'calls' | 'feed' | 'search' | 'settings';
 
 export default function BottomNav({ active, onChange, onCreatePost }: { active: Tab, onChange: (t: Tab) => void, onCreatePost: () => void }) {
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 flex justify-center pointer-events-none">
-      <div className="flex items-center justify-between w-full max-w-md px-6 py-3 rounded-[30px] bg-[#1a1a1a]/90 backdrop-blur-xl border border-white/10 shadow-2xl pointer-events-auto">
-        <button onClick={() => onChange('chats')} className="w-12 flex justify-center"><ChatIcon size={24} color={active === 'chats' ? 'var(--app-accent)' : '#666'} /></button>
-        <button onClick={() => onChange('calls')} className="w-12 flex justify-center"><PhoneIcon size={24} color={active === 'calls' ? 'var(--app-accent)' : '#666'} /></button>
-        <motion.button whileTap={{ scale: 0.9 }} onClick={onCreatePost} className="w-14 h-14 rounded-full flex items-center justify-center -mt-8 shadow-lg shadow-blue-500/50 bg-blue-500"><PlusIcon size={28} color="#fff" /></motion.button>
-        <button onClick={() => onChange('search')} className="w-12 flex justify-center"><SearchIcon size={24} color={active === 'search' ? 'var(--app-accent)' : '#666'} /></button>
-        <button onClick={() => onChange('settings')} className="w-12 flex justify-center"><SettingsIcon size={24} color={active === 'settings' ? 'var(--app-accent)' : '#666'} /></button>
+    <div className="fixed bottom-0 left-0 right-0 z-50 p-2 pb-safe" style={{ background: 'var(--app-surface)', borderTop: '1px solid var(--app-border)' }}>
+      <div className="flex justify-between items-center max-w-md mx-auto relative px-2">
+        <NavBtn icon={<ChatIcon size={24} />} label="Чаты" isActive={active === 'chats'} onClick={() => onChange('chats')} />
+        <NavBtn icon={<PhoneIcon size={24} />} label="Звонки" isActive={active === 'calls'} onClick={() => onChange('calls')} />
+        
+        {/* Кнопка плюс */}
+        <div className="relative -top-4">
+          <motion.button whileTap={{ scale: 0.9 }} onClick={onCreatePost} className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg text-white" style={{ background: 'var(--app-accent)' }}>
+            <PlusIcon size={28} />
+          </motion.button>
+        </div>
+
+        <NavBtn icon={<span className="text-[22px]">🌐</span>} label="Лента" isActive={active === 'feed'} onClick={() => onChange('feed')} />
+        <NavBtn icon={<SettingsIcon size={24} />} label="Настройки" isActive={active === 'settings'} onClick={() => onChange('settings')} />
       </div>
     </div>
   );
 }
+
+const NavBtn = ({ icon, label, isActive, onClick }: any) => (
+  <button onClick={onClick} className="flex flex-col items-center justify-center w-14 gap-1 transition-colors" style={{ color: isActive ? 'var(--app-accent)' : 'var(--app-text-muted)' }}>
+    {icon}
+    <span className="text-[10px] font-medium">{label}</span>
+  </button>
+);
