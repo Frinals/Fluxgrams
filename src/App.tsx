@@ -11,11 +11,14 @@ import ChatView from '@/components/ChatView';
 import SettingsView from '@/components/SettingsView';
 import UserProfileModal from '@/components/UserProfileModal';
 
-class ErrorBoundary extends React.Component<any, any> {
-  state = { hasError: false, error: null };
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
   static getDerivedStateFromError(error: any) { return { hasError: true, error }; }
   render() {
-    if (this.state.hasError) return <div style={{ padding: 20, background: 'red', color: 'white', minHeight: '100vh' }}><h1>Ошибка!</h1><p>{this.state.error.message}</p></div>;
+    if (this.state.hasError) return <div style={{ padding: 20, background: 'red', color: 'white', minHeight: '100vh' }}><h1>Ошибка!</h1><p>{this.state.error?.message}</p></div>;
     return this.props.children;
   }
 }
@@ -58,7 +61,13 @@ function MessengerApp() {
     <div className="h-screen flex flex-col bg-[#0f1115]">
       <div className="flex-1 relative overflow-hidden">
         {openChat ? (
-          <ChatView chatId={openChat.chatId} peer={openChat.peer} group={null} onBack={() => setOpenChat(null)} onCall={() => alert('Звонки в разработке')} />
+          <ChatView 
+            chatId={openChat.chatId} 
+            peer={openChat.peer} 
+            group={null} 
+            onBack={() => setOpenChat(null)} 
+            onCall={() => alert('Звонки в разработке')} 
+          />
         ) : (
           <>
             {activeTab === 'chats' && <ChatList onOpenChat={(chatId: string, peer: any) => setOpenChat({ chatId, peer })} onOpenGroup={() => {}} />}
@@ -93,7 +102,13 @@ function MessengerApp() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider><LanguageProvider><AuthProvider><MessengerApp /></AuthProvider></LanguageProvider></ThemeProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <MessengerApp />
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }
