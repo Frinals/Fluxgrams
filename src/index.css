@@ -133,3 +133,17 @@ body {
   0% { box-shadow: 0 0 15px #f12711, 0 0 25px #f5af19; }
   100% { box-shadow: 0 0 25px #f12711, 0 0 45px #f5af19; }
 }
+/* Отключает выделение текста при быстрых свайпах (как в приложениях) */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Делает прокрутку плавной на iOS */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Запрещает странице "отскакивать" при прокрутке вверх-вниз */
+body {
+  overscroll-behavior-y: none;
+}
