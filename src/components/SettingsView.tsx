@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { themes, themeList } from '@/lib/types';
@@ -13,8 +13,8 @@ export default function SettingsView({ onViewProfile }: any) {
   const [subPage, setSubPage] = useState<SubPage>('main');
   
   // Стейты для редактирования профиля
-  const [editName, setEditName] = useState(profile?.display_name || '');
-  const [editUsername, setEditUsername] = useState(profile?.username || '');
+  const [editName, setEditName] = useState('');
+  const [editUsername, setEditUsername] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
   // Стейты для окошка с ошибкой
@@ -24,35 +24,59 @@ export default function SettingsView({ onViewProfile }: any) {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
 
+  // Когда профиль загружается, мы заполняем поля его данными
+  useEffect(() => {
+    if (profile) {
+      setEditName(profile.display_name || '');
+      setEditUsername(profile.username || '');
+    }
+  }, [profile]);
+
   const handleSaveProfile = async () => {
     if (!user) return;
     setIsSaving(true);
 
-    // Очищаем юзернейм от лишних символов
+    // Очищаем юзернейм от лишних символов (пробелы, спецзнаки)
     const cleanUsername = editUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+
+    // Проверяем длину
+    if (cleanUsername.length < 3) {
+      setErrorText('Юзернейм должен быть не короче 3 символов');
+      setShowErrorModal(true);
+      setIsSaving(false);
+      return;
+    }
 
     // ПРОВЕРКА: Не занят ли уже такой юзернейм кем-то другим?
     const { data: existingUser } = await supabase
       .from('profiles')
       .select('id')
       .eq('username', cleanUsername)
-      .neq('id', user.id) // Исключаем самого себя (чтобы можно было сохранить свой же ник)
+      .neq('id', user.id) // Исключаем самого себя
       .maybeSingle();
 
     if (existingUser) {
-      // Если нашли кого-то с таким ником, показываем окошко
       setErrorText('Данный юз занят');
       setShowErrorModal(true);
       setIsSaving(false);
-      return; // Останавливаем сохранение
+      return;
     }
 
-    // Если ник свободен, сохраняем
-    await supabase.from('profiles').update({ 
+    // ОТПРАВЛЯЕМ В БАЗУ И ЖДЕМ ОТВЕТА
+    const { error } = await supabase.from('profiles').update({ 
       display_name: editName.trim(), 
       username: cleanUsername 
     }).eq('id', user.id);
+
+    if (error) {
+      // Если база данных не сохранила (например, нет прав RLS), показываем ошибку!
+      setErrorText('Ошибка сохранения: ' + error.message);
+      setShowErrorModal(true);
+      setIsSaving(false);
+      return;
+    }
     
+    // Если всё ок, обновляем данные на экране
     await refreshProfile();
     setIsSaving(false);
     setSubPage('main');
@@ -62,21 +86,37 @@ export default function SettingsView({ onViewProfile }: any) {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     
+    setIsSaving(true); // Показываем состояние загрузки
     const fileName = `profile/${user.id}/${type}_${Date.now()}.${file.name.split('.').pop()}`;
-    const { error } = await supabase.storage.from('media').upload(fileName, file);
-    if (error) { alert(error.message); return; }
+    
+    // 1. Загружаем файл в хранилище
+    const { error: uploadError } = await supabase.storage.from('media').upload(fileName, file);
+    if (uploadError) { 
+      alert('Ошибка загрузки файла: ' + uploadError.message); 
+      setIsSaving(false); 
+      return; 
+    }
 
+    // 2. Получаем ссылку на файл
     const { data } = supabase.storage.from('media').getPublicUrl(fileName);
 
+    // 3. Сохраняем ссылку в базу данных профиля
     if (type === 'music') {
       const newSong = { title: file.name.split('.')[0], url: data.publicUrl };
       const currentMusic = profile?.profile_music || [];
-      await supabase.from('profiles').update({ profile_music: [...currentMusic, newSong] }).eq('id', user.id);
+      const { error: updateError } = await supabase.from('profiles').update({ profile_music: [...currentMusic, newSong] }).eq('id', user.id);
+      
+      if (updateError) alert('Ошибка сохранения музыки: ' + updateError.message);
+      else alert('Трек успешно добавлен!');
     } else {
-      await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', user.id);
+      const { error: updateError } = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', user.id);
+      
+      if (updateError) alert('Ошибка сохранения аватара: ' + updateError.message);
+      else alert('Аватар успешно обновлен!');
     }
+    
     await refreshProfile();
-    alert('Успешно загружено!');
+    setIsSaving(false);
   };
 
   const cards = [
@@ -89,12 +129,12 @@ export default function SettingsView({ onViewProfile }: any) {
   return (
     <div className="flex flex-col h-full overflow-y-auto" style={{ background: 'var(--app-bg)' }}>
       
-      {/* === ОКОШКО С ОШИБКОЙ (ЮЗ ЗАНЯТ) === */}
+      {/* === ОКОШКО С ОШИБКОЙ === */}
       {showErrorModal && (
         <div className="fixed inset-0 z-[99999] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="rounded-3xl p-6 w-full max-w-xs text-center border shadow-2xl" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
             <div className="text-4xl mb-3">⚠️</div>
-            <p className="font-bold text-lg mb-6" style={{ color: 'var(--app-text)' }}>{errorText}</p>
+            <p className="font-bold text-[15px] mb-6" style={{ color: 'var(--app-text)' }}>{errorText}</p>
             <button onClick={() => setShowErrorModal(false)} className="w-full py-3 rounded-xl font-bold text-white" style={{ background: 'var(--app-accent)' }}>
               Понятно
             </button>
@@ -146,7 +186,7 @@ export default function SettingsView({ onViewProfile }: any) {
               <div className="w-24 h-24 rounded-full overflow-hidden border-4" style={{ borderColor: 'var(--app-surface)' }}>
                 {profile?.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-white" style={{ background: 'var(--app-accent)' }}>U</div>}
               </div>
-              <button onClick={() => avatarInputRef.current?.click()} className="absolute bottom-0 right-0 p-2 rounded-full text-white border-2" style={{ background: 'var(--app-accent)', borderColor: 'var(--app-bg)' }}><ImageIcon size={16} /></button>
+              <button onClick={() => avatarInputRef.current?.click()} disabled={isSaving} className="absolute bottom-0 right-0 p-2 rounded-full text-white border-2 disabled:opacity-50" style={{ background: 'var(--app-accent)', borderColor: 'var(--app-bg)' }}><ImageIcon size={16} /></button>
               <input type="file" ref={avatarInputRef} hidden accept="image/*" onChange={(e) => handleFileUpload(e, 'avatar')} />
             </div>
           </div>
@@ -163,8 +203,8 @@ export default function SettingsView({ onViewProfile }: any) {
             
             <div className="pt-4 border-t" style={{ borderColor: 'var(--app-border)' }}>
               <label className="block text-sm mb-2" style={{ color: 'var(--app-text-muted)' }}>Музыка в профиль</label>
-              <button onClick={() => musicInputRef.current?.click()} className="w-full p-3 rounded-xl border text-center font-medium" style={{ background: 'var(--app-surface)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }}>
-                + Загрузить трек (mp3)
+              <button onClick={() => musicInputRef.current?.click()} disabled={isSaving} className="w-full p-3 rounded-xl border text-center font-medium disabled:opacity-50" style={{ background: 'var(--app-surface)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }}>
+                {isSaving ? 'Загрузка...' : '+ Загрузить трек (mp3)'}
               </button>
               <input type="file" ref={musicInputRef} hidden accept="audio/*" onChange={(e) => handleFileUpload(e, 'music')} />
             </div>
