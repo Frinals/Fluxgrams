@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
-const themes = {
+export const themes = {
   pitch_black: { bg: '#000000', surface: '#0a0a0a', text: '#ffffff', muted: '#666666', border: '#1a1a1a', accent: '#3b82f6' },
   light: { bg: '#f3f4f6', surface: '#ffffff', text: '#111827', muted: '#6b7280', border: '#e5e7eb', accent: '#2563eb' },
   new_year: { bg: '#0a192f', surface: '#112240', text: '#ffffff', muted: '#8892b0', border: '#233554', accent: '#64ffda' },
@@ -20,12 +20,16 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<ThemeKeys>(() => {
-    return (localStorage.getItem('app_theme') as ThemeKeys) || 'dark';
+    const saved = localStorage.getItem('app_theme') as ThemeKeys;
+    // ЗАЩИТА: Если сохраненной темы нет в новом списке, включаем темную
+    return (saved && themes[saved]) ? saved : 'dark';
   });
 
   useEffect(() => {
     localStorage.setItem('app_theme', theme);
     const t = themes[theme];
+    if (!t) return; // Защита от вылета
+    
     const root = document.documentElement;
     
     root.style.setProperty('--app-bg', t.bg);
@@ -41,10 +45,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>
-      {/* Эффекты для тем */}
-      {theme === 'new_year' && <div className="snowflakes" aria-hidden="true">{Array.from({length: 20}).map((_, i) => <div key={i} className="snowflake">❅</div>)}</div>}
+      {theme === 'new_year' && <div className="snowflakes" aria-hidden="true">{Array.from({length: 20}).map((_, i) => <div key={i} className="snowflake" style={{ left: `${Math.random() * 100}%`, animationDuration: `${Math.random() * 4 + 3}s` }}>❅</div>)}</div>}
       {theme === 'halloween' && <div className="spiderweb">🕸️</div>}
-      
       {children}
     </ThemeContext.Provider>
   );
