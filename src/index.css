@@ -43,6 +43,16 @@
   --app-glow: #ff00ff;
 }
 
+[data-theme="new_year"] {
+  --app-bg: #0a192f;
+  --app-surface: rgba(17, 34, 64, 0.8);
+  --app-text: #ffffff;
+  --app-text-muted: #8892b0;
+  --app-border: rgba(35, 53, 84, 0.5);
+  --app-accent: #64ffda;
+  --app-glow: #64ffda;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -50,66 +60,48 @@ body {
   color: var(--app-text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow: hidden;
+  overscroll-behavior-y: none; /* Убирает отскок страницы */
 }
 
+/* --- ОБЩИЕ ЭФФЕКТЫ СТЕКЛА --- */
 .glass-panel {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
   border-radius: 24px;
-}
-
-.glass-nav {
-  background: var(--app-nav-bg);
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
 }
 
-* { -webkit-tap-highlight-color: transparent; }
-.scroll-smooth-touch { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.glass-nav {
+  background: var(--app-nav-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--app-border);
+}
+
+/* --- ПЛАВНОСТЬ И СКРОЛЛ --- */
+* { 
+  -webkit-tap-highlight-color: transparent; 
+}
+.overflow-y-auto { 
+  -webkit-overflow-scrolling: touch; 
+  scroll-behavior: smooth; 
+}
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-thumb { background: var(--app-border); border-radius: 4px; }
 
-/* ВОТ ЭТА СТРОЧКА УБИВАЕТ ВСЕ КВАДРАТЫ ВО ВСЕХ ФАЙЛАХ */
+/* Скрываем старые квадраты */
 .liquid-orb {
   display: none !important;
 }
-/* --- КАСТОМНЫЕ ШРИФТЫ ДЛЯ НИКНЕЙМОВ --- */
+
+/* --- ШРИФТЫ --- */
 .font-default { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 .font-serif { font-family: 'Georgia', serif; font-style: italic; }
 .font-mono { font-family: 'Courier New', monospace; letter-spacing: -1px; }
-.font-bold-caps { text-transform: uppercase; letter-spacing: 2px; }
+.font-bold-caps { text-transform: uppercase; letter-spacing: 2px; font-weight: 900; }
 
-/* --- КАСТОМНЫЕ РАМКИ ДЛЯ АВАТАРОК --- */
-.frame-default { border-color: var(--app-bg); }
-
-/* Золотая рамка */
-.frame-gold {
-  border: 4px solid transparent !important;
-  background: linear-gradient(var(--app-bg), var(--app-bg)) padding-box,
-              linear-gradient(45deg, #FFD700, #FFA500, #FFD700) border-box;
-}
-
-/* Неоновая рамка */
-.frame-neon {
-  border: 4px solid transparent !important;
-  background: linear-gradient(var(--app-bg), var(--app-bg)) padding-box,
-              linear-gradient(45deg, #00f2fe, #4facfe, #00f2fe) border-box;
-  box-shadow: 0 0 15px rgba(0, 242, 254, 0.6);
-}
-
-/* Огненная рамка */
-.frame-fire {
-  border: 4px solid transparent !important;
-  background: linear-gradient(var(--app-bg), var(--app-bg)) padding-box,
-              linear-gradient(45deg, #f12711, #f5af19, #f12711) border-box;
-}
-/* --- ШРИФТЫ --- */
-.font-default { font-family: inherit; }
-.font-bold-caps { text-transform: uppercase; font-weight: 900; letter-spacing: 2px; }
-.font-serif { font-family: 'Georgia', serif; font-style: italic; }
-.font-mono { font-family: 'Courier New', monospace; font-weight: bold; }
-
-/* --- РАМКИ --- */
+/* --- РАМКИ ДЛЯ АВАТАРОК --- */
 /* Золотая */
 .frame-gold {
   border: 3px solid #FFD700 !important;
@@ -122,10 +114,10 @@ body {
   box-shadow: 0 0 20px #00f2fe, 0 0 10px #4facfe inset;
 }
 
-/* Огненная (выходит за края) */
+/* Огненная */
 .frame-fire {
   border: 3px solid #f12711 !important;
-  box-shadow: 0 0 15px #f12711, 0 0 30px #f5af19, 0 0 45px #f12711;
+  box-shadow: 0 0 15px #f12711, 0 0 30px #f5af19;
   animation: firePulse 2s infinite alternate;
 }
 
@@ -133,33 +125,64 @@ body {
   0% { box-shadow: 0 0 15px #f12711, 0 0 25px #f5af19; }
   100% { box-shadow: 0 0 25px #f12711, 0 0 45px #f5af19; }
 }
-/* Отключает выделение текста при быстрых свайпах (как в приложениях) */
-* {
-  -webkit-tap-highlight-color: transparent;
+
+/* --- ФИШКА: МОРОЗНЫЙ ИНЕЙ ПО КРАЯМ ЭКРАНА --- */
+.frost-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  box-shadow: inset 0 0 100px rgba(100, 255, 218, 0.1),
+              inset 0 0 40px rgba(100, 255, 218, 0.05);
+  background: radial-gradient(circle at center, transparent 60%, rgba(10, 25, 47, 0.4) 100%);
 }
 
-/* Делает прокрутку плавной на iOS */
-.overflow-y-auto {
-  -webkit-overflow-scrolling: touch;
+/* --- РЕАЛИСТИЧНЫЙ ПЛАВНЫЙ 3D СНЕГ --- */
+.snow-container {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
 }
 
-/* Запрещает странице "отскакивать" при прокрутке вверх-вниз */
-body {
-  overscroll-behavior-y: none;
+.snow-particle {
+  position: absolute;
+  top: -20px;
+  background: white;
+  border-radius: 50%;
+  opacity: 0;
+  animation: realisticSnow linear infinite;
+  will-change: transform, opacity;
 }
-/* Снег для Нового года */
-.snowflakes { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; }
-.snowflake { position: absolute; top: -10px; color: white; opacity: 0.7; font-size: 1.5em; animation: fall linear infinite; }
-@keyframes fall { to { transform: translateY(100vh); } }
-.snowflake:nth-child(1) { left: 10%; animation-duration: 5s; }
-.snowflake:nth-child(2) { left: 20%; animation-duration: 7s; }
-.snowflake:nth-child(3) { left: 30%; animation-duration: 6s; }
-.snowflake:nth-child(4) { left: 40%; animation-duration: 8s; }
-.snowflake:nth-child(5) { left: 50%; animation-duration: 5s; }
-.snowflake:nth-child(6) { left: 60%; animation-duration: 9s; }
-.snowflake:nth-child(7) { left: 70%; animation-duration: 6s; }
-.snowflake:nth-child(8) { left: 80%; animation-duration: 4s; }
-.snowflake:nth-child(9) { left: 90%; animation-duration: 7s; }
+
+@keyframes realisticSnow {
+  0% {
+    transform: translateY(-20px) translateX(0px) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  50% {
+    transform: translateY(50vh) translateX(40px) rotate(180deg);
+  }
+  90% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(105vh) translateX(-20px) rotate(360deg);
+    opacity: 0;
+  }
+}
 
 /* Паутина для Хэллоуина */
-.spiderweb { position: fixed; top: 0; right: 0; font-size: 8rem; opacity: 0.3; pointer-events: none; z-index: 0; }
+.spiderweb { 
+  position: fixed; 
+  top: 0; 
+  right: 0; 
+  font-size: 8rem; 
+  opacity: 0.3; 
+  pointer-events: none; 
+  z-index: 0; 
+}
