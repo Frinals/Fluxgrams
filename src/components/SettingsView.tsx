@@ -42,10 +42,11 @@ export default function SettingsView({ onViewProfile }: any) {
       return;
     }
 
+    // Проверяем через ilike (чтобы не зависело от больших/маленьких букв)
     const { data: existingUser } = await supabase
       .from('profiles')
       .select('id')
-      .eq('username', cleanUsername)
+      .ilike('username', cleanUsername)
       .neq('id', user.id)
       .maybeSingle();
 
@@ -56,13 +57,19 @@ export default function SettingsView({ onViewProfile }: any) {
       return;
     }
 
+    // Отправляем в базу
     const { error } = await supabase.from('profiles').update({ 
       display_name: editName.trim(), 
       username: cleanUsername 
     }).eq('id', user.id);
 
+    // Если база данных заблокировала сохранение (ошибка 23505 - это код уникальности)
     if (error) {
-      setErrorText('Ошибка сохранения: ' + error.message);
+      if (error.code === '23505') {
+        setErrorText('Данный юз занят');
+      } else {
+        setErrorText('Ошибка сохранения: ' + error.message);
+      }
       setShowErrorModal(true);
       setIsSaving(false);
       return;
