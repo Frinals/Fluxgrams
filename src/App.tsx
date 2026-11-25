@@ -14,7 +14,7 @@ import SearchView from '@/components/SearchView';
 import FeedView from '@/components/FeedView';
 import CallScreen from '@/components/CallScreen';
 import { useCall } from '@/hooks/useCall';
-import { useNotifications } from '@/hooks/useNotifications'; // <-- ИМПОРТ
+import { useNotifications } from '@/hooks/useNotifications';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
   constructor(props: any) {
@@ -38,18 +38,18 @@ function MessengerApp() {
   const [postText, setPostText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
 
-  // Включаем радар уведомлений
+  // Радар уведомлений (сообщения)
   useNotifications();
 
+  // Достаем данные звонка
   const { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute } = useCall();
-  const [activeCallPeer, setActiveCallPeer] = useState<any>(null);
 
   const handleOpenProfile = useCallback((id: string) => setViewingProfileId(id), []);
   const handleOpenChat = useCallback((chatId: string, peer: any) => setOpenChat({ chatId, peer }), []);
 
+  // ИСПРАВЛЕНИЕ: Передаем весь объект peer в startCall, чтобы useCall знал, кому звонить
   const handleStartCall = (peer: any) => {
-    setActiveCallPeer(peer);
-    startCall(peer.id);
+    startCall(peer);
   };
 
   const handleCreatePost = async () => {
@@ -67,9 +67,17 @@ function MessengerApp() {
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-black relative">
+      
+      {/* ЭКРАН ЗВОНКА (ИСПРАВЛЕН: использует remotePeer напрямую) */}
       <AnimatePresence>
         {callState !== 'idle' && (
-          <CallScreen callState={callState} peer={activeCallPeer || { display_name: 'Собеседник' }} isMuted={isMuted} toggleMute={toggleMute} endCall={endCall} />
+          <CallScreen 
+            callState={callState} 
+            peer={remotePeer || { display_name: 'Собеседник' }} 
+            isMuted={isMuted} 
+            toggleMute={toggleMute} 
+            endCall={endCall} 
+          />
         )}
       </AnimatePresence>
 
