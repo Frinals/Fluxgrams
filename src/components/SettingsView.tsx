@@ -12,19 +12,16 @@ export default function SettingsView({ onViewProfile }: any) {
   const { theme, setTheme } = useTheme();
   const [subPage, setSubPage] = useState<SubPage>('main');
   
-  // Стейты для редактирования профиля
   const [editName, setEditName] = useState('');
   const [editUsername, setEditUsername] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
-  // Стейты для окошка с ошибкой
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorText, setErrorText] = useState('');
   
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
 
-  // Когда профиль загружается, мы заполняем поля его данными
   useEffect(() => {
     if (profile) {
       setEditName(profile.display_name || '');
@@ -36,10 +33,8 @@ export default function SettingsView({ onViewProfile }: any) {
     if (!user) return;
     setIsSaving(true);
 
-    // Очищаем юзернейм от лишних символов (пробелы, спецзнаки)
     const cleanUsername = editUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
 
-    // Проверяем длину
     if (cleanUsername.length < 3) {
       setErrorText('Юзернейм должен быть не короче 3 символов');
       setShowErrorModal(true);
@@ -47,12 +42,11 @@ export default function SettingsView({ onViewProfile }: any) {
       return;
     }
 
-    // ПРОВЕРКА: Не занят ли уже такой юзернейм кем-то другим?
     const { data: existingUser } = await supabase
       .from('profiles')
       .select('id')
       .eq('username', cleanUsername)
-      .neq('id', user.id) // Исключаем самого себя
+      .neq('id', user.id)
       .maybeSingle();
 
     if (existingUser) {
@@ -62,21 +56,18 @@ export default function SettingsView({ onViewProfile }: any) {
       return;
     }
 
-    // ОТПРАВЛЯЕМ В БАЗУ И ЖДЕМ ОТВЕТА
     const { error } = await supabase.from('profiles').update({ 
       display_name: editName.trim(), 
       username: cleanUsername 
     }).eq('id', user.id);
 
     if (error) {
-      // Если база данных не сохранила (например, нет прав RLS), показываем ошибку!
       setErrorText('Ошибка сохранения: ' + error.message);
       setShowErrorModal(true);
       setIsSaving(false);
       return;
     }
     
-    // Если всё ок, обновляем данные на экране
     await refreshProfile();
     setIsSaving(false);
     setSubPage('main');
@@ -86,10 +77,9 @@ export default function SettingsView({ onViewProfile }: any) {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     
-    setIsSaving(true); // Показываем состояние загрузки
+    setIsSaving(true); 
     const fileName = `profile/${user.id}/${type}_${Date.now()}.${file.name.split('.').pop()}`;
     
-    // 1. Загружаем файл в хранилище
     const { error: uploadError } = await supabase.storage.from('media').upload(fileName, file);
     if (uploadError) { 
       alert('Ошибка загрузки файла: ' + uploadError.message); 
@@ -97,10 +87,8 @@ export default function SettingsView({ onViewProfile }: any) {
       return; 
     }
 
-    // 2. Получаем ссылку на файл
     const { data } = supabase.storage.from('media').getPublicUrl(fileName);
 
-    // 3. Сохраняем ссылку в базу данных профиля
     if (type === 'music') {
       const newSong = { title: file.name.split('.')[0], url: data.publicUrl };
       const currentMusic = profile?.profile_music || [];
@@ -129,7 +117,6 @@ export default function SettingsView({ onViewProfile }: any) {
   return (
     <div className="flex flex-col h-full overflow-y-auto" style={{ background: 'var(--app-bg)' }}>
       
-      {/* === ОКОШКО С ОШИБКОЙ === */}
       {showErrorModal && (
         <div className="fixed inset-0 z-[99999] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="rounded-3xl p-6 w-full max-w-xs text-center border shadow-2xl" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
