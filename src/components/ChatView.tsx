@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { BackIcon, SendIcon, PhoneIcon, PaperclipIcon, ImageIcon, PlayIcon, PauseIcon, XIcon, TrashIcon, MusicIcon } from '@/components/Icons';
+import { BackIcon, SendIcon, PhoneIcon, PaperclipIcon, VerifiedIcon } from '@/components/Icons';
 
 export default function ChatView({ chatId, peer, group, onBack, onCall }: any) {
   const { user } = useAuth();
@@ -10,16 +10,7 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: any) {
   const [input, setInput] = useState('');
   const [selectedMsg, setSelectedMsg] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [showAttach, setShowAttach] = useState(false);
   
-  const [currentAudio, setCurrentAudio] = useState<any | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [showFullPlayer, setShowFullPlayer] = useState(false);
-  
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const loadMessages = useCallback(async () => {
     const query = supabase.from('messages').select('*').order('created_at', { ascending: true }).limit(100);
     if (chatId) query.eq('chat_id', chatId);
@@ -32,7 +23,10 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: any) {
     loadMessages();
     const channel = supabase.channel(`chat_${chatId || group?.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
-        if (payload.eventType === 'INSERT') setMessages(prev => [...prev, payload.new]);
+        if (payload.eventType === 'INSERT') {
+          // Проверяем, нет ли уже такого сообщения (чтобы не было дублей)
+          setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new]);
+        }
         if (payload.eventType === 'UPDATE') setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
         if (payload.eventType === 'DELETE') setMessages(prev => prev.filter(m => m.id !== payload.old.id));
       }).subscribe();
@@ -41,24 +35,27 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: any) {
 
   const handleSend = async () => {
     if (!input.trim() || !user) return;
+    
+    const textToSend = input;
+    setInput(''); // Очищаем поле сразу
+
     if (isEditing && selectedMsg) {
-      await supabase.from('messages').update({ content: input }).eq('id', selectedMsg.id);
+      await supabase.from('messages').update({ content: textToSend }).eq('id', selectedMsg.id);
       setIsEditing(false); setSelectedMsg(null);
     } else {
-      await supabase.from('messages').insert({ sender_id: user.id, content: input, chat_id: chatId, group_id: group?.id });
-    }
-    setInput('');
-  };
+      // МГНОВЕННОЕ ОТОБРАЖЕНИЕ (Оптимистичный UI)
+      const tempId = Date.now().toString();
+      const newMsg = { id: tempId, sender_id: user.id, content: textToSend, created_at: new Date().toISOString(), chat_id: chatId };
+      setMessages(prev => [...prev, newMsg]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    const fileName = `chats/${Date.now()}.${file.name.split('.').pop()}`;
-    const { error } = await supabase.storage.from('media').upload(fileName, file);
-    if (error) return alert(error.message);
-    const { data } = await supabase.storage.from('media').getPublicUrl(fileName);
-    await supabase.from('messages').insert({ sender_id: user.id, media_url: data.publicUrl, media_type: type === 'image' ? 'image' : 'file', content: file.name, chat_id: chatId, group_id: group?.id });
-    setShowAttach(false);
+      // Отправляем в базу
+      const { data, error } = await supabase.from('messages').insert({ sender_id: user.id, content: textToSend, chat_id: chatId, group_id: group?.id }).select().single();
+      
+      // Если сервер вернул настоящее сообщение, заменяем временное на настоящее
+      if (data) {
+        setMessages(prev => prev.map(m => m.id === tempId ? data : m));
+      }
+    }
   };
 
   return (
@@ -67,7 +64,12 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: any) {
         <button onClick={onBack} className="p-2 text-white"><BackIcon size={22} /></button>
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {peer?.avatar_url ? <img src={peer.avatar_url} className="w-10 h-10 rounded-full object-cover" /> : <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold bg-blue-500">{(peer?.display_name || 'U')[0]}</div>}
-          <div className="flex-1 min-w-0"><p className="font-semibold truncate text-white">{group ? group.name : peer?.display_name}</p></div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1">
+              <p className="font-semibold truncate text-white">{group ? group.name : peer?.display_name}</p>
+              {peer?.is_verified && <VerifiedIcon size={16} className="text-blue-500" />}
+            </div>
+          </div>
         </div>
         {!group && <button onClick={() => onCall && onCall(peer, 'audio')} className="p-2 text-blue-500"><PhoneIcon size={20} /></button>}
       </div>
@@ -100,10 +102,7 @@ export default function ChatView({ chatId, peer, group, onBack, onCall }: any) {
       </AnimatePresence>
 
       <div className="p-3 bg-[#1a1a1a] border-t border-white/10 flex items-center gap-2">
-        <button onClick={() => setShowAttach(!showAttach)} className="p-2 text-gray-400"><PaperclipIcon size={24} /></button>
-        <input type="file" ref={galleryInputRef} hidden accept="image/*" onChange={(e) => handleFileUpload(e, 'image')} />
-        <input type="file" ref={fileInputRef} hidden onChange={(e) => handleFileUpload(e, 'file')} />
-        
+        <button className="p-2 text-gray-400"><PaperclipIcon size={24} /></button>
         <input type="text" value={input} onChange={e => setInput(e.target.value)} placeholder="Сообщение..." className="flex-1 px-4 py-2.5 rounded-2xl bg-[#0f1115] text-white border border-white/10 outline-none" />
         <button onClick={handleSend} className="p-2.5 rounded-full bg-blue-500 text-white"><SendIcon size={20} /></button>
       </div>
