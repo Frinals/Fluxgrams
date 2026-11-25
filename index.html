@@ -4,13 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fluxgram Messenger Web App</title>
-    <script>
-      window.onerror = function(msg, url, line, col, error) {
-        document.body.innerHTML = '<div style="color:white; background:#c00; padding:20px; font-family:sans-serif; min-height:100vh;"><h2>ОШИБКА!</h2><p><b>Текст:</b> ' + msg + '</p><p><b>Файл:</b> ' + url + '</p><p><b>Строка:</b> ' + line + '</p></div>';
-      };
-    </script>
   </head>
-  <body style="margin: 0; padding: 0;">
+  <body>
     <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
