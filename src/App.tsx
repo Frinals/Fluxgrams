@@ -54,7 +54,10 @@ function MessengerApp() {
     </div>
   );
 
-  if (loading) return <div className="h-screen bg-[#0f1115]" />;
+  // ⬇️ ВОТ ЗДЕСЬ ИЗМЕНЕНИЕ ⬇️
+  if (loading) return <div className="h-screen flex items-center justify-center bg-[#0f1115] text-white text-xl font-bold">Загрузка...</div>;
+  // ⬆️ ТЕПЕРЬ ВЫ УВИДИТЕ ТЕКСТ, А НЕ ПРОСТО ЧЕРНЫЙ ЭКРАН ⬆️
+
   if (!user || needsEmailVerification) return <AuthScreen />;
 
   return (
