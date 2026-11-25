@@ -60,7 +60,6 @@ export default function FeedView({ onViewProfile }: any) {
 
               <p className="mb-4 text-[15px] leading-relaxed" style={{ color: 'var(--app-text)' }}>{post.content}</p>
 
-              {/* ИСПОЛЬЗУЕМ ЭМОДЗИ ВМЕСТО ИКОНОК */}
               <div className="flex items-center gap-6 pt-3 border-t" style={{ borderColor: 'var(--app-border)' }}>
                 <button onClick={() => handleLike(post.id, post.likes || 0)} className="flex items-center gap-1.5 text-sm font-semibold transition-transform active:scale-95" style={{ color: 'var(--app-accent)' }}>
                   ❤️ {post.likes || 0}
