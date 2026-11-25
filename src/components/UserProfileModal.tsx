@@ -83,3 +83,38 @@ export default function UserProfileModal({ profileId, onClose }: any) {
     </motion.div>
   );
 }
+import { useRef, useState } from 'react';
+import { PlayIcon, PauseIcon } from '@/components/Icons';
+
+export default function SongPlayer({ songs }: { songs: any[] }) {
+  const [current, setCurrent] = useState<any>(null);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const toggle = (song: any) => {
+    if (current?.id === song.id) {
+      playing ? audioRef.current?.pause() : audioRef.current?.play();
+      setPlaying(!playing);
+    } else {
+      setCurrent(song);
+      setPlaying(true);
+      setTimeout(() => audioRef.current?.play(), 100);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {songs.map(s => (
+        <div
+          key={s.id}
+          onClick={() => toggle(s)}
+          className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl cursor-pointer"
+        >
+          {current?.id === s.id && playing ? <PauseIcon /> : <PlayIcon />}
+          <span>{s.title}</span>
+        </div>
+      ))}
+      <audio ref={audioRef} onEnded={() => setPlaying(false)} />
+    </div>
+  );
+}
