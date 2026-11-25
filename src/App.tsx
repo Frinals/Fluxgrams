@@ -12,6 +12,7 @@ import SettingsView from '@/components/SettingsView';
 import UserProfileModal from '@/components/UserProfileModal';
 import SearchView from '@/components/SearchView';
 import FeedView from '@/components/FeedView';
+import { useCall } from '@/hooks/useCall'; // <-- ИМПОРТ ЗВОНКОВ
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
   constructor(props: any) {
@@ -35,6 +36,9 @@ function MessengerApp() {
   const [postText, setPostText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
 
+  // ПОДКЛЮЧАЕМ ЗВОНКИ
+  const { startCall, callState, acceptCall, endCall } = useCall();
+
   // Оптимизация: функции не пересоздаются при каждом рендере
   const handleOpenProfile = useCallback((id: string) => setViewingProfileId(id), []);
   const handleOpenChat = useCallback((chatId: string, peer: any) => setOpenChat({ chatId, peer }), []);
@@ -53,7 +57,24 @@ function MessengerApp() {
   if (!user || needsEmailVerification) return <AuthScreen />;
 
   return (
-    <div className="h-[100dvh] flex flex-col overflow-hidden bg-black">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-black relative">
+      
+      {/* ОКНО ВХОДЯЩЕГО ЗВОНКА */}
+      <AnimatePresence>
+        {callState === 'incoming' && (
+          <motion.div initial={{ y: -100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -100, opacity: 0 }} className="fixed top-4 left-4 right-4 bg-[#1a1a1a] p-4 rounded-2xl shadow-2xl z-[99999] flex items-center justify-between border border-white/10">
+            <div>
+              <p className="text-white font-bold">Входящий звонок</p>
+              <p className="text-sm text-gray-400">Пользователь звонит вам</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={acceptCall} className="px-4 py-2 bg-green-500 text-white rounded-xl font-bold active:scale-95 transition-transform">Принять</button>
+              <button onClick={endCall} className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold active:scale-95 transition-transform">Сбросить</button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex-1 relative overflow-hidden">
         {openChat ? (
           <ChatView 
@@ -61,7 +82,7 @@ function MessengerApp() {
             peer={openChat.peer} 
             group={null} 
             onBack={() => setOpenChat(null)} 
-            onCall={() => alert('Звонки в разработке')} 
+            onCall={(peer: any) => startCall(peer.id)} // <-- ЗАПУСК ЗВОНКА ПРИ НАЖАТИИ
             onViewProfile={handleOpenProfile} 
           />
         ) : (
@@ -73,7 +94,8 @@ function MessengerApp() {
             {activeTab === 'calls' && (
               <div className="h-full flex flex-col items-center justify-center text-white">
                 <div className="text-6xl mb-4">📞</div>
-                <h2 className="text-xl font-bold">Звонки в разработке</h2>
+                <h2 className="text-xl font-bold">История звонков</h2>
+                <p className="text-sm text-gray-400 mt-2">Здесь будут ваши звонки</p>
               </div>
             )}
           </>
@@ -117,27 +139,5 @@ export default function App() {
         </LanguageProvider>
       </ThemeProvider>
     </ErrorBoundary>
-  );
-}
-import { useCall } from '@/hooks/useCall';
-import { motion } from 'framer-motion';
-
-function MessengerApp() {
-  const { startCall, callState, acceptCall, endCall, remotePeer } = useCall();
-  // ...
-  return (
-    <div className="h-[100dvh] flex flex-col overflow-hidden bg-black">
-      {/* ... остальной код ... */}
-      {callState === 'incoming' && (
-        <motion.div initial={{ y: -100 }} animate={{ y: 0 }} className="fixed top-4 left-4 right-4 bg-[#1a1a1a] p-4 rounded-2xl shadow-2xl z-[9999] flex items-center justify-between border border-white/10">
-          <div><p className="text-white font-bold">Входящий звонок</p><p className="text-sm text-gray-400">от {remotePeer}</p></div>
-          <div className="flex gap-2">
-            <button onClick={acceptCall} className="px-4 py-2 bg-green-500 text-white rounded-xl font-bold">Принять</button>
-            <button onClick={endCall} className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold">Отклонить</button>
-          </div>
-        </motion.div>
-      )}
-      {/* ... */}
-    </div>
   );
 }
