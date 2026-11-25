@@ -27,68 +27,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (uid: string) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', uid)
-        .maybeSingle();
-      if (!error && data) {
-        setProfile(data as Profile);
-      } else if (error) {
-        console.error('[AuthContext] fetchProfile error:', error);
-      }
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+      if (!error && data) setProfile(data as Profile);
     } catch (err) {
-      console.error('[AuthContext] Ошибка при получении профиля:', err);
+      console.error("Профиль не загружен", err);
     }
   };
 
   useEffect(() => {
-    // Оборачиваем в catch, чтобы при ошибке Supabase приложение не висело вечно
+    let isMounted = true;
+
+    // ТАЙМЕР: Если Supabase не отвечает 4 секунды, принудительно выключаем загрузку
+    const timeoutId = setTimeout(() => {
+      if (isMounted) {
+        console.warn("Supabase завис. Принудительный вход.");
+        setLoading(false);
+      }
+    }, 4000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         if (!session.user.email_confirmed_at) {
           setNeedsEmailVerification(true);
-          setLoading(false);
         } else {
-          setNeedsEmailVerification(false);
-          fetchProfile(session.user.id).finally(() => setLoading(false));
+          fetchProfile(session.user.id);
         }
-      } else {
-        setLoading(false);
       }
-    }).catch((error) => {
-      console.error("Ошибка getSession (проверьте ключи Supabase):", error);
-      setLoading(false); // Принудительно выключаем загрузку при ошибке!
+      setLoading(false);
+      clearTimeout(timeoutId);
+    }).catch((err) => {
+      console.error("Ошибка соединения:", err);
+      if (isMounted) {
+        setLoading(false);
+        clearTimeout(timeoutId);
+      }
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         if (!session.user.email_confirmed_at) {
           setNeedsEmailVerification(true);
-          setLoading(false);
         } else {
-          setNeedsEmailVerification(false);
-          fetchProfile(session.user.id).finally(() => setLoading(false));
+          fetchProfile(session.user.id);
         }
       } else {
         setProfile(null);
         setNeedsEmailVerification(false);
-        setLoading(false);
       }
+      setLoading(false);
     });
 
     return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
       authListener.subscription.unsubscribe();
     };
   }, []);
 
-  const refreshProfile = async () => {
-    if (user) await fetchProfile(user.id);
-  };
+  const refreshProfile = async () => { if (user) await fetchProfile(user.id); };
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -106,30 +108,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) return { error: error.message };
 
     if (data.user) {
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          username: username.trim(),
-          display_name: displayName.trim(),
-        })
-        .eq('id', data.user.id);
-
+      const { error: updateError } = await supabase.from('profiles').update({ username: username.trim(), display_name: displayName.trim() }).eq('id', data.user.id);
       if (updateError) {
-        await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            username: username.trim(),
-            display_name: displayName.trim(),
-          });
+        await supabase.from('profiles').insert({ id: data.user.id, username: username.trim(), display_name: displayName.trim() });
       }
-
       if (!data.user.email_confirmed_at) {
         setNeedsEmailVerification(true);
         return { error: null, needsVerification: true };
       }
     }
-
     return { error: null };
   };
 
