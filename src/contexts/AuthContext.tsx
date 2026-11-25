@@ -25,47 +25,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
 
+  const fetchProfile = async (uid: string) => {
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+      if (!error && data) {
+        setProfile(data as Profile);
+      }
+    } catch (err) {
+      console.error("Ошибка загрузки профиля", err);
+    }
+  };
+
   useEffect(() => {
-    let mounted = true;
-    
-    // Если Supabase не отвечает 5 секунд, принудительно пускаем на экран входа
+    let isMounted = true;
+
     const timer = setTimeout(() => {
-      if (mounted) setLoading(false);
+      if (isMounted && loading) setLoading(false);
     }, 5000);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return;
+      if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user && !session.user.email_confirmed_at) {
-        setNeedsEmailVerification(true);
+      if (session?.user) {
+        fetchProfile(session.user.id).finally(() => {
+          setLoading(false);
+          clearTimeout(timer);
+        });
+      } else {
+        setLoading(false);
+        clearTimeout(timer);
       }
-      setLoading(false);
-      clearTimeout(timer);
-    }).catch(() => {
-      if (mounted) setLoading(false);
-      clearTimeout(timer);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return;
+      if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
       setLoading(false);
     });
 
     return () => {
-      mounted = false;
+      isMounted = false;
       clearTimeout(timer);
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, []); // Убрали зависимость от loading, чтобы не было зацикливания
 
   const refreshProfile = async () => {
-    if (user) {
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-      if (data) setProfile(data as Profile);
-    }
+    if (user) await fetchProfile(user.id);
   };
 
   const signIn = async (email: string, password: string) => {
