@@ -9,15 +9,17 @@ export default function MusicPlayer({ songs, initialIndex, onClose }: any) {
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  const currentSong = songs[currentIndex];
+  const currentSong = songs && songs[currentIndex] ? songs[currentIndex] : null;
 
   useEffect(() => {
-    if (audioRef.current) {
+    if (audioRef.current && currentSong) {
       audioRef.current.src = currentSong.url;
-      audioRef.current.play();
+      audioRef.current.play().catch(e => console.log("Ошибка воспроизведения:", e));
       setIsPlaying(true);
     }
   }, [currentIndex, currentSong]);
+
+  if (!currentSong) return null; // Защита
 
   const togglePlay = () => {
     if (isPlaying) audioRef.current?.pause();
