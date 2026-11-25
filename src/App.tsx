@@ -12,7 +12,7 @@ import SettingsView from '@/components/SettingsView';
 import UserProfileModal from '@/components/UserProfileModal';
 import SearchView from '@/components/SearchView';
 import FeedView from '@/components/FeedView';
-import { useCall } from '@/hooks/useCall'; // <-- ИМПОРТ ЗВОНКОВ
+import { useCall } from '@/hooks/useCall';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
   constructor(props: any) {
@@ -36,10 +36,8 @@ function MessengerApp() {
   const [postText, setPostText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
 
-  // ПОДКЛЮЧАЕМ ЗВОНКИ
   const { startCall, callState, acceptCall, endCall } = useCall();
 
-  // Оптимизация: функции не пересоздаются при каждом рендере
   const handleOpenProfile = useCallback((id: string) => setViewingProfileId(id), []);
   const handleOpenChat = useCallback((chatId: string, peer: any) => setOpenChat({ chatId, peer }), []);
 
@@ -82,7 +80,7 @@ function MessengerApp() {
             peer={openChat.peer} 
             group={null} 
             onBack={() => setOpenChat(null)} 
-            onCall={(peer: any) => startCall(peer.id)} // <-- ЗАПУСК ЗВОНКА ПРИ НАЖАТИИ
+            onCall={(peer: any) => startCall(peer.id)}
             onViewProfile={handleOpenProfile} 
           />
         ) : (
@@ -91,13 +89,6 @@ function MessengerApp() {
             {activeTab === 'feed' && <FeedView onViewProfile={handleOpenProfile} />}
             {activeTab === 'search' && <SearchView onOpenChat={handleOpenChat} onViewProfile={handleOpenProfile} />}
             {activeTab === 'settings' && <SettingsView onViewProfile={handleOpenProfile} />}
-            {activeTab === 'calls' && (
-              <div className="h-full flex flex-col items-center justify-center text-white">
-                <div className="text-6xl mb-4">📞</div>
-                <h2 className="text-xl font-bold">История звонков</h2>
-                <p className="text-sm text-gray-400 mt-2">Здесь будут ваши звонки</p>
-              </div>
-            )}
           </>
         )}
       </div>
