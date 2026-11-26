@@ -4,7 +4,7 @@
 
 :root {
   --app-bg: #0f1115;
-  --app-surface: rgba(30, 34, 42, 0.6);
+  --app-surface: rgba(30, 34, 42, 0.7);
   --app-text: #ffffff;
   --app-text-muted: #8892a0;
   --app-border: rgba(255, 255, 255, 0.1);
@@ -12,16 +12,16 @@
 }
 
 [data-theme="light"] {
-  --app-bg: #f5f6f8; --app-surface: rgba(255, 255, 255, 0.7); --app-text: #111111; --app-text-muted: #6b7280; --app-border: rgba(0,0,0,0.1); --app-accent: #2563eb;
+  --app-bg: #f5f6f8; --app-surface: rgba(255, 255, 255, 0.8); --app-text: #111111; --app-text-muted: #6b7280; --app-border: rgba(0,0,0,0.1); --app-accent: #2563eb;
 }
 [data-theme="halloween"] {
-  --app-bg: #0a0505; --app-surface: rgba(40, 15, 10, 0.6); --app-text: #ff9900; --app-text-muted: #cc5500; --app-border: rgba(255,153,0,0.2); --app-accent: #ff5500;
+  --app-bg: #0a0505; --app-surface: rgba(40, 15, 10, 0.7); --app-text: #ff9900; --app-text-muted: #cc5500; --app-border: rgba(255,153,0,0.2); --app-accent: #ff5500;
 }
 [data-theme="cyberpunk"] {
-  --app-bg: #050510; --app-surface: rgba(15, 0, 30, 0.6); --app-text: #00f0ff; --app-text-muted: #ff007f; --app-border: rgba(255,0,127,0.4); --app-accent: #ff007f;
+  --app-bg: #050510; --app-surface: rgba(15, 0, 30, 0.7); --app-text: #00f0ff; --app-text-muted: #ff007f; --app-border: rgba(255,0,127,0.4); --app-accent: #ff007f;
 }
 [data-theme="new_year"] {
-  --app-bg: #0a192f; --app-surface: rgba(17, 34, 64, 0.6); --app-text: #ffffff; --app-text-muted: #8892b0; --app-border: rgba(35,53,84,0.5); --app-accent: #64ffda;
+  --app-bg: #0a192f; --app-surface: rgba(17, 34, 64, 0.7); --app-text: #ffffff; --app-text-muted: #8892b0; --app-border: rgba(35,53,84,0.5); --app-accent: #64ffda;
 }
 
 body {
@@ -30,40 +30,29 @@ body {
   overflow: hidden; overscroll-behavior-y: none;
 }
 
-/* --- ЖИДКОЕ СТЕКЛО (ОБЪЕМНОЕ, КАК НА 3 ФОТО) --- */
+/* --- ЖИДКОЕ СТЕКЛО (Оптимизированное, без лагов) --- */
 .liquid-glass {
   background: var(--app-surface);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: blur(12px); /* Уменьшили блюр для плавности */
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--app-border);
-  box-shadow: 
-    inset 0 2px 4px rgba(255, 255, 255, 0.2), /* Блик сверху */
-    inset 0 -2px 4px rgba(0, 0, 0, 0.3), /* Тень снизу */
-    0 8px 32px rgba(0, 0, 0, 0.2); /* Внешняя тень */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   position: relative;
-  overflow: hidden;
 }
 
-/* Дополнительный блик для объема */
-.liquid-glass::after {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 50%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 100%);
-  pointer-events: none; border-radius: inherit;
-}
-
-/* --- РЕАЛИСТИЧНАЯ ПАУТИНА В ЧАТЕ --- */
+/* --- ПАУТИНА ДЛЯ ХЭЛЛОУИНА --- */
 .chat-cobweb-overlay {
   position: absolute; inset: 0; pointer-events: none; z-index: 0; display: none; overflow: hidden;
 }
 
 [data-theme="halloween"] .chat-cobweb-overlay {
-  display: block; /* Включается только в Хэллоуин */
+  display: block;
 }
 
 .cobweb-corner {
-  position: absolute; width: 250px; height: 250px;
-  background-image: url('data:image/svg+xml;utf8,<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L200 200 M0 0 L200 0 M0 0 L0 200 M0 0 L150 200 M0 0 L200 150 M0 0 L100 200 M0 0 L200 100 M0 0 L50 200 M0 0 L200 50" stroke="rgba(255,153,0,0.4)" stroke-width="2"/><path d="M30 0 Q15 15 0 30 M60 0 Q30 30 0 60 M100 0 Q50 50 0 100 M140 0 Q70 70 0 140 M180 0 Q90 90 0 180 M200 30 Q100 100 30 200 M200 60 Q100 130 60 200 M200 100 Q130 160 100 200 M200 140 Q160 180 140 200" stroke="rgba(255,153,0,0.2)" fill="none" stroke-width="1.5"/></svg>');
-  background-size: contain; background-repeat: no-repeat; opacity: 0.6;
+  position: absolute; width: 200px; height: 200px;
+  background-image: url('data:image/svg+xml;utf8,<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L200 200 M0 0 L200 0 M0 0 L0 200 M0 0 L150 200 M0 0 L200 150 M0 0 L100 200 M0 0 L200 100 M0 0 L50 200 M0 0 L200 50" stroke="rgba(255,153,0,0.3)" stroke-width="2"/><path d="M30 0 Q15 15 0 30 M60 0 Q30 30 0 60 M100 0 Q50 50 0 100 M140 0 Q70 70 0 140 M180 0 Q90 90 0 180 M200 30 Q100 100 30 200 M200 60 Q100 130 60 200 M200 100 Q130 160 100 200 M200 140 Q160 180 140 200" stroke="rgba(255,153,0,0.15)" fill="none" stroke-width="1.5"/></svg>');
+  background-size: contain; background-repeat: no-repeat; opacity: 0.8;
   animation: swayWeb 8s ease-in-out infinite alternate;
 }
 
@@ -73,12 +62,13 @@ body {
 @keyframes swayWeb { 0% { transform: rotate(0deg) scale(1); } 100% { transform: rotate(4deg) scale(1.05); } }
 @keyframes swayWebRight { 0% { transform: rotate(0deg) scale(1); } 100% { transform: rotate(-4deg) scale(1.05); } }
 
-/* --- ОСТАЛЬНЫЕ ЭФФЕКТЫ --- */
+/* --- ПЛАВНОСТЬ --- */
 * { -webkit-tap-highlight-color: transparent; }
-.overflow-y-auto { -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+.overflow-y-auto { -webkit-overflow-scrolling: touch; scroll-behavior: smooth; will-change: scroll-position; }
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-thumb { background: var(--app-border); border-radius: 4px; }
 
+/* --- СНЕГ --- */
 .snow-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999; overflow: hidden; }
 .snow-particle { position: absolute; top: -20px; background: white; border-radius: 50%; opacity: 0; animation: realisticSnow linear infinite; will-change: transform, opacity; }
 @keyframes realisticSnow {
