@@ -37,24 +37,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     
-    // Аварийный таймер, чтобы приложение не висело вечно
+    // Даем максимум 8 секунд на проверку (на случай совсем плохого интернета)
     const timer = setTimeout(() => {
       if (isMounted) setLoading(false);
-    }, 5000);
+    }, 8000);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // ГЛАВНОЕ ИСПРАВЛЕНИЕ: Отключаем загрузку СРАЗУ, не ждем профиль
+      setLoading(false); 
+      clearTimeout(timer);
+
       if (session?.user) {
         if (!session.user.email_confirmed_at) {
           setNeedsEmailVerification(true);
         } else {
+          // Профиль грузим в фоне
           fetchProfile(session.user.id);
         }
       }
-      setLoading(false);
-      clearTimeout(timer);
     }).catch(() => {
       if (isMounted) setLoading(false);
       clearTimeout(timer);
@@ -64,13 +68,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
+      setLoading(false);
+      
       if (session?.user) {
         fetchProfile(session.user.id);
       } else {
         setProfile(null);
         setNeedsEmailVerification(false);
       }
-      setLoading(false);
     });
 
     return () => {
@@ -131,4 +136,4 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
-}
+      }
