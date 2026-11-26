@@ -11,7 +11,7 @@ import ChatView from '@/components/ChatView';
 import SettingsView from '@/components/SettingsView';
 import UserProfileModal from '@/components/UserProfileModal';
 import FeedView from '@/components/FeedView';
-import CallsView from '@/components/CallsView'; // <-- НОВЫЙ ИМПОРТ
+import CallsView from '@/components/CallsView';
 import CallScreen from '@/components/CallScreen';
 import { useCall } from '@/hooks/useCall';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -28,34 +28,28 @@ function MessengerApp() {
 
   useNotifications();
   const { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute } = useCall();
-  
-  // Для тестового баннера
-  const [testPeer, setTestPeer] = useState<any>({ id: 'test', display_name: 'Тестовый Пользователь' });
 
   const handleStartCall = (peer: any) => startCall(peer);
-  const handleTestBanner = () => {
-    // Принудительно имитируем входящий звонок
-    setTestPeer({ id: 'test', display_name: 'Тестовый Пользователь' });
-    (window as any).triggerFakeCall = true; // хак для useCall (в реальном проекте лучше через контекст)
-    alert('Смотри вверх экрана! Баннер появится через 2 секунды');
-    setTimeout(() => {
-      useCall().setCallState('incoming'); // Это не сработает напрямую, используем костыль ниже
-    }, 1000);
-  };
-
-  // Фейковый вызов для баннера
   const simulateIncoming = () => {
     const callEvent = new CustomEvent('fakeIncomingCall');
     window.dispatchEvent(callEvent);
   };
 
-  if (loading) return <div className="h-[100dvh] flex items-center justify-center font-bold" style={{ color: 'var(--app-text)' }}>Загрузка...</div>;
+  // КРАСИВЫЙ ЭКРАН ЗАГРУЗКИ
+  if (loading) return (
+    <div className="h-[100dvh] flex flex-col items-center justify-center bg-black">
+      <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p className="text-white font-bold text-lg">Подключение...</p>
+      <p className="text-gray-500 text-sm mt-2">Проверяем сеть</p>
+    </div>
+  );
+  
   if (!user || needsEmailVerification) return <AuthScreen />;
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden relative" style={{ background: 'var(--app-bg)' }}>
       
-      {/* БАННЕР */}
+      {/* БАННЕР ЗВОНКА */}
       <AnimatePresence>
         {callState === 'incoming' && (
           <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-4 left-4 right-4 z-[99999] rounded-3xl p-4 shadow-2xl flex items-center justify-between liquid-glass">
@@ -76,16 +70,23 @@ function MessengerApp() {
         )}
       </AnimatePresence>
 
-      {/* ЭКРАН ЗВОНКА */}
+      {/* ПОЛНОЭКРАННЫЙ ЗВОНОК */}
       <AnimatePresence>
         {(callState === 'calling' || callState === 'active') && (
-          <CallScreen callState={callState} peer={remotePeer} isMuted={isMuted} toggleMute={toggleMute} endCall={endCall} />
+          <CallScreen callState={callState} peer={remotePeer || { display_name: 'Собеседник' }} isMuted={isMuted} toggleMute={toggleMute} endCall={endCall} />
         )}
       </AnimatePresence>
 
       <div className="flex-1 relative overflow-hidden">
         {openChat ? (
-          <ChatView chatId={openChat.chatId} peer={openChat.peer} group={null} onBack={() => setOpenChat(null)} onCall={() => handleStartCall(openChat.peer)} onViewProfile={(id: string) => setViewingProfileId(id)} />
+          <ChatView 
+            chatId={openChat.chatId} 
+            peer={openChat.peer} 
+            group={null} 
+            onBack={() => setOpenChat(null)} 
+            onCall={() => handleStartCall(openChat.peer)} 
+            onViewProfile={(id: string) => setViewingProfileId(id)} 
+          />
         ) : (
           <>
             {activeTab === 'chats' && <ChatList onOpenChat={(c, p) => setOpenChat({ chatId: c, peer: p })} onViewProfile={(id) => setViewingProfileId(id)} />}
@@ -98,11 +99,10 @@ function MessengerApp() {
 
       {!openChat && <BottomNav active={activeTab} onChange={setActiveTab} onCreatePost={() => setShowPostModal(true)} />}
 
-      {/* Модалки */}
       <AnimatePresence>
         {viewingProfileId && <UserProfileModal profileId={viewingProfileId} onClose={() => setViewingProfileId(null)} />}
       </AnimatePresence>
-      
+
       <AnimatePresence>
         {showPostModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowPostModal(false)}>
@@ -113,9 +113,12 @@ function MessengerApp() {
                 <button onClick={() => setShowPostModal(false)} className="flex-1 py-3 rounded-2xl font-semibold" style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--app-text)' }}>Отмена</button>
                 <button onClick={async () => {
                   if (!postText.trim()) return;
+                  setIsPosting(true);
                   await supabase.from('user_posts').insert({ user_id: user.id, content: postText });
-                  setPostText(''); setShowPostModal(false); setViewingProfileId(user.id);
-                }} disabled={!postText.trim()} className="flex-1 py-3 rounded-2xl font-semibold text-white" style={{ background: 'var(--app-accent)' }}>Опубликовать</button>
+                  setPostText(''); setShowPostModal(false); setIsPosting(false); setViewingProfileId(user.id);
+                }} disabled={isPosting || !postText.trim()} className="flex-1 py-3 rounded-2xl font-semibold text-white disabled:opacity-50" style={{ background: 'var(--app-accent)' }}>
+                  {isPosting ? '...' : 'Опубликовать'}
+                </button>
               </div>
             </motion.div>
           </motion.div>
@@ -135,4 +138,4 @@ export default function App() {
       </LanguageProvider>
     </ThemeProvider>
   );
-}
+                                                                                                                    }
