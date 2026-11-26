@@ -26,7 +26,7 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           setMessages(prev => {
-            // ЗАЩИТА ОТ ДУБЛИКАТОВ
+            // Защита от дубликатов
             if (prev.some(m => m.id === payload.new.id)) return prev;
             return [...prev, payload.new];
           });
@@ -37,7 +37,6 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
     return () => { supabase.removeChannel(channel); };
   }, [loadMessages]);
 
-  // Автоскролл вниз при новом сообщении
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -51,15 +50,12 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
       await supabase.from('messages').update({ content: textToSend }).eq('id', selectedMsg.id);
       setIsEditing(false); setSelectedMsg(null);
     } else {
-      // Временно показываем сообщение (оптимистичный UI)
       const tempId = `temp-${Date.now()}`;
       const newMsg = { id: tempId, sender_id: user.id, content: textToSend, created_at: new Date().toISOString(), chat_id: chatId };
       setMessages(prev => [...prev, newMsg]);
 
-      // Отправляем в базу
       const { data, error } = await supabase.from('messages').insert({ sender_id: user.id, content: textToSend, chat_id: chatId, group_id: group?.id }).select().single();
       
-      // Заменяем временное сообщение на настоящее, если сервер ответил успешно
       if (data && !error) {
         setMessages(prev => {
           const filtered = prev.filter(m => m.id !== tempId); 
@@ -71,10 +67,8 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
   };
 
   return (
-    // ДОБАВЛЕН КЛАСС chat-bg-cobweb ДЛЯ ПАУТИНЫ
     <div className="flex flex-col h-[100dvh] chat-bg-cobweb" style={{ background: 'var(--app-bg)' }}>
       
-      {/* Шапка чата */}
       <div className="flex items-center gap-3 p-3 border-b z-20" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
         <button onClick={onBack} className="p-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /></button>
         
@@ -91,7 +85,6 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
         {!group && <button onClick={() => onCall && onCall(peer, 'audio')} className="p-2" style={{ color: 'var(--app-accent)' }}><PhoneIcon size={20} /></button>}
       </div>
 
-      {/* Лента сообщений */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
         {messages.map(msg => (
           <div key={msg.id} className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
@@ -103,7 +96,6 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Поле ввода */}
       <div className="p-2 border-t flex items-center gap-2 pb-safe" style={{ background: 'var(--app-surface)', borderColor: 'var(--app-border)' }}>
         <button className="p-2" style={{ color: 'var(--app-text-muted)' }}><PaperclipIcon size={24} /></button>
         <input type="text" value={input} onChange={e => setInput(e.target.value)} placeholder="Сообщение..." className="flex-1 px-4 py-2.5 rounded-2xl outline-none border" style={{ background: 'var(--app-bg)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
@@ -111,4 +103,4 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
       </div>
     </div>
   );
-        }
+              }
