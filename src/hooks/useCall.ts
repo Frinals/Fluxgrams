@@ -5,13 +5,13 @@ import { useAuth } from '@/contexts/AuthContext';
 export function useCall() {
   const { user } = useAuth();
   const [callState, setCallState] = useState<'idle' | 'calling' | 'incoming' | 'active'>('idle');
-  const [remotePeer, setRemotePeer] = useState<any>(null); // Тут будем хранить данные звонящего
+  const [remotePeer, setRemotePeer] = useState<any>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const channelRef = useRef<any>(null);
-  const remoteOfferRef = useRef<any>(null); // Сохраняем входящий оффер
+  const remoteOfferRef = useRef<any>(null);
 
   // 1. Слушаем входящие звонки
   useEffect(() => {
@@ -19,15 +19,13 @@ export function useCall() {
     const channel = supabase.channel(`calls:${user.id}`);
     
     channel.on('broadcast', { event: 'incoming_call' }, async (payload) => {
-      remoteOfferRef.current = payload.payload.sdp; // Сохраняем оффер
+      remoteOfferRef.current = payload.payload.sdp;
       
-      // Подгружаем профиль звонящего, чтобы показать имя и аву
       const { data } = await supabase.from('profiles').select('*').eq('id', payload.payload.from).single();
       setRemotePeer(data || { id: payload.payload.from, display_name: 'Пользователь' });
       
       setCallState('incoming');
 
-      // Уведомление на телефон
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('Входящий звонок!', {
           body: `Звонит ${data?.display_name || 'Пользователь'}`,
@@ -59,13 +57,22 @@ export function useCall() {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
-  // 2. Совершаем звонок
+  // 2. СЛУШАТЕЛЬ ДЛЯ ТЕСТА БАННЕРА (Тот самый кусок, который сломал сборку)
+  useEffect(() => {
+    const handleFakeCall = () => {
+      setRemotePeer({ display_name: 'Тестовый Пользователь' });
+      setCallState('incoming');
+    };
+    window.addEventListener('fakeIncomingCall', handleFakeCall);
+    return () => window.removeEventListener('fakeIncomingCall', handleFakeCall);
+  }, []);
+
+  // 3. Совершаем звонок
   const startCall = useCallback(async (peer: any) => {
     if (!user) return;
     setCallState('calling');
     setRemotePeer(peer);
 
-    // Запрашиваем микрофон
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     setLocalStream(stream);
 
@@ -74,18 +81,15 @@ export function useCall() {
     
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-    // Передаем наши ICE-кандидаты (маршруты соединения)
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         channelRef.current?.send({ type: 'broadcast', event: 'ice_candidate', payload: { candidate: event.candidate, to: peer.id } });
       }
     };
 
-    // Создаем Оффер (предложение)
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    // Отправляем Оффер собеседнику
     channelRef.current?.send({
       type: 'broadcast',
       event: 'incoming_call',
@@ -93,7 +97,7 @@ export function useCall() {
     });
   }, [user]);
 
-  // 3. Принимаем звонок
+  // 4. Принимаем звонок
   const acceptCall = useCallback(async () => {
     if (!remotePeer || !user || !remoteOfferRef.current) return;
     setCallState('active');
@@ -112,12 +116,10 @@ export function useCall() {
       }
     };
 
-    // ГЛАВНОЕ ИСПРАВЛЕНИЕ: Устанавливаем Оффер и генерируем Ответ (Answer)
     await pc.setRemoteDescription(new RTCSessionDescription(remoteOfferRef.current));
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
-    // Отправляем Ответ обратно звонящему
     channelRef.current?.send({ 
       type: 'broadcast', 
       event: 'call_accepted', 
@@ -142,16 +144,6 @@ export function useCall() {
     remoteOfferRef.current = null;
   }, [localStream]);
 
+  // ВОТ ТУТ ДОЛЖЕН БЫТЬ RETURN (ВНУТРИ ФУНКЦИИ!)
   return { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute };
 }
-// Внутри useCall, перед return добавь слушатель фейкового звонка:
-useEffect(() => {
-  const handleFakeCall = () => {
-    setRemotePeer({ display_name: 'Тестовый Пользователь' });
-    setCallState('incoming');
-  };
-  window.addEventListener('fakeIncomingCall', handleFakeCall);
-  return () => window.removeEventListener('fakeIncomingCall', handleFakeCall);
-}, []);
-
-return { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute };
