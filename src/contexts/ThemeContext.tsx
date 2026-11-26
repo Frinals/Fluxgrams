@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
 export const themes = {
-  pitch_black: { bg: '#000000', surface: '#0a0a0a', text: '#ffffff', muted: '#666666', border: '#1a1a1a', accent: '#3b82f6' },
-  light: { bg: '#f3f4f6', surface: '#ffffff', text: '#111827', muted: '#6b7280', border: '#e5e7eb', accent: '#2563eb' },
-  new_year: { bg: '#0a192f', surface: 'rgba(17, 34, 64, 0.8)', text: '#ffffff', muted: '#8892b0', border: '#233554', accent: '#64ffda' }, 
-  halloween: { bg: '#1a0b0b', surface: '#2b1313', text: '#ff9900', muted: '#c06c00', border: '#ff990033', accent: '#ff5500' },
-  cyberpunk: { bg: '#0d0221', surface: '#1b0b3b', text: '#00f0ff', muted: '#ff007f', border: '#ff007f', accent: '#ff007f' },
-  dark: { bg: '#0f1115', surface: 'rgba(26, 26, 26, 0.8)', text: '#ffffff', muted: '#9ca3af', border: '#2d3748', accent: '#3b82f6' },
+  pitch_black: { bg: '#000000', surface: 'rgba(20, 20, 20, 0.6)', text: '#ffffff', muted: '#666666', border: 'rgba(255,255,255,0.1)', accent: '#3b82f6' },
+  light: { bg: '#f3f4f6', surface: 'rgba(255, 255, 255, 0.6)', text: '#111827', muted: '#6b7280', border: 'rgba(0,0,0,0.1)', accent: '#2563eb' },
+  new_year: { bg: '#0a192f', surface: 'rgba(17, 34, 64, 0.6)', text: '#ffffff', muted: '#8892b0', border: 'rgba(35, 53, 84, 0.5)', accent: '#64ffda' }, 
+  halloween: { bg: '#0a0505', surface: 'rgba(30, 10, 10, 0.6)', text: '#ff9900', muted: '#cc5500', border: 'rgba(255, 153, 0, 0.2)', accent: '#ff5500' },
+  cyberpunk: { bg: '#050510', surface: 'rgba(15, 0, 30, 0.6)', text: '#00f0ff', muted: '#ff007f', border: 'rgba(255, 0, 127, 0.4)', accent: '#ff007f' },
+  dark: { bg: '#0f1115', surface: 'rgba(30, 34, 42, 0.6)', text: '#ffffff', muted: '#9ca3af', border: 'rgba(255, 255, 255, 0.1)', accent: '#3b82f6' },
 };
 
 type ThemeKeys = keyof typeof themes;
@@ -30,6 +30,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (!t) return;
     
     const root = document.documentElement;
+    
+    // ВОТ ЭТА СТРОЧКА ВКЛЮЧАЕТ ПАУТИНУ И ДРУГИЕ ЭФФЕКТЫ
+    root.setAttribute('data-theme', theme);
+
     root.style.setProperty('--app-bg', t.bg);
     root.style.setProperty('--app-surface', t.surface);
     root.style.setProperty('--app-text', t.text);
@@ -43,39 +47,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>
-      
-      {/* 1. ЭФФЕКТ МОРОЗНОГО ИНЕЯ (ФИШКА) */}
-      {theme === 'new_year' && <div className="frost-overlay" />}
-
-      {/* 2. ПЛАВНЫЙ 3D СНЕГ */}
       {theme === 'new_year' && (
         <div className="snow-container">
-          {Array.from({ length: 60 }).map((_, i) => {
-            // Генерация случайных параметров
-            const size = Math.random() * 6 + 2; // от 2 до 8 пикселей
-            const isBlurred = Math.random() > 0.5; // 50% снежинок размыты (дальний план)
-            const blurAmount = isBlurred ? Math.random() * 3 + 1 : 0;
-            
-            return (
-              <div 
-                key={i} 
-                className="snow-particle" 
-                style={{ 
-                  left: `${Math.random() * 100}%`, 
-                  width: `${size}px`, 
-                  height: `${size}px`,
-                  filter: `blur(${blurAmount}px)`,
-                  animationDuration: `${Math.random() * 6 + 7}s`, // Очень плавное падение (7-13 сек)
-                  animationDelay: `${Math.random() * 8}s` // Разное время старта
-                }} 
-              />
-            );
-          })}
+          {Array.from({ length: 50 }).map((_, i) => (
+            <div key={i} className="snow-particle" style={{ left: `${Math.random() * 100}%`, width: `${Math.random() * 5 + 2}px`, height: `${Math.random() * 5 + 2}px`, filter: Math.random() > 0.5 ? `blur(${Math.random() * 2 + 1}px)` : 'none', animationDuration: `${Math.random() * 6 + 7}s`, animationDelay: `${Math.random() * 8}s` }} />
+          ))}
         </div>
       )}
-
-      {theme === 'halloween' && <div className="spiderweb">🕸️</div>}
-      
       {children}
     </ThemeContext.Provider>
   );
