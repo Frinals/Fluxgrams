@@ -4,53 +4,47 @@
 
 :root {
   --app-bg: #0f1115;
-  --app-surface: rgba(30, 34, 42, 0.8);
+  --app-surface: rgba(30, 34, 42, 0.7);
   --app-text: #ffffff;
   --app-text-muted: #8892a0;
   --app-border: rgba(255, 255, 255, 0.1);
-  --app-border-glass: rgba(255, 255, 255, 0.15);
-  --app-accent: #ff6b6b;
-  --app-accent-gradient: linear-gradient(135deg, #ff6b6b, #ee5a24);
-  --app-danger: #ef4444;
-  --app-success: #2ecc71;
-  --app-bubbleSentText: #ffffff;
-  --app-bubbleRecvText: #ffffff;
-  --app-nav-bg: rgba(15, 17, 21, 0.85);
-  --app-glow: #ee5a24;
+  --app-accent: #3b82f6;
 }
 
 [data-theme="light"] {
   --app-bg: #f5f6f8;
-  --app-surface: rgba(255, 255, 255, 0.9);
+  --app-surface: rgba(255, 255, 255, 0.7);
   --app-text: #111111;
   --app-text-muted: #6b7280;
   --app-border: rgba(0, 0, 0, 0.1);
-  --app-border-glass: rgba(0, 0, 0, 0.08);
-  --app-accent: #ff6b6b;
-  --app-nav-bg: rgba(255, 255, 255, 0.9);
-  --app-bubbleSentText: #ffffff;
-  --app-bubbleRecvText: #111111;
+  --app-accent: #2563eb;
 }
 
-[data-theme="neon"] {
+[data-theme="halloween"] {
+  --app-bg: #0a0505;
+  --app-surface: rgba(30, 10, 10, 0.7);
+  --app-text: #ff9900;
+  --app-text-muted: #cc5500;
+  --app-border: rgba(255, 153, 0, 0.2);
+  --app-accent: #ff5500;
+}
+
+[data-theme="cyberpunk"] {
   --app-bg: #050510;
-  --app-surface: rgba(20, 20, 40, 0.8);
-  --app-text: #00ffff;
-  --app-text-muted: #0088cc;
-  --app-border: rgba(0, 255, 255, 0.3);
-  --app-accent: #ff00ff;
-  --app-accent-gradient: linear-gradient(135deg, #ff00ff, #00ffff);
-  --app-glow: #ff00ff;
+  --app-surface: rgba(15, 0, 30, 0.8);
+  --app-text: #00f0ff;
+  --app-text-muted: #ff007f;
+  --app-border: rgba(255, 0, 127, 0.4);
+  --app-accent: #ff007f;
 }
 
 [data-theme="new_year"] {
   --app-bg: #0a192f;
-  --app-surface: rgba(17, 34, 64, 0.8);
+  --app-surface: rgba(17, 34, 64, 0.7);
   --app-text: #ffffff;
   --app-text-muted: #8892b0;
   --app-border: rgba(35, 53, 84, 0.5);
   --app-accent: #64ffda;
-  --app-glow: #64ffda;
 }
 
 body {
@@ -58,131 +52,61 @@ body {
   padding: 0;
   background-color: var(--app-bg);
   color: var(--app-text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   overflow: hidden;
-  overscroll-behavior-y: none; /* Убирает отскок страницы */
+  overscroll-behavior-y: none;
 }
 
-/* --- ОБЩИЕ ЭФФЕКТЫ СТЕКЛА --- */
-.glass-panel {
+/* --- ЭФФЕКТ ЖИДКОГО СТЕКЛА (LIQUID GLASS) --- */
+.liquid-glass {
   background: var(--app-surface);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
   border: 1px solid var(--app-border);
-  border-radius: 24px;
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
 }
 
-.glass-nav {
-  background: var(--app-nav-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid var(--app-border);
-}
-
-/* --- ПЛАВНОСТЬ И СКРОЛЛ --- */
-* { 
-  -webkit-tap-highlight-color: transparent; 
-}
-.overflow-y-auto { 
-  -webkit-overflow-scrolling: touch; 
-  scroll-behavior: smooth; 
-}
+/* --- ОПТИМИЗАЦИЯ И ПЛАВНОСТЬ --- */
+* { -webkit-tap-highlight-color: transparent; }
+.overflow-y-auto { -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-thumb { background: var(--app-border); border-radius: 4px; }
 
-/* Скрываем старые квадраты */
-.liquid-orb {
-  display: none !important;
-}
-
-/* --- ШРИФТЫ --- */
-.font-default { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-.font-serif { font-family: 'Georgia', serif; font-style: italic; }
-.font-mono { font-family: 'Courier New', monospace; letter-spacing: -1px; }
-.font-bold-caps { text-transform: uppercase; letter-spacing: 2px; font-weight: 900; }
-
-/* --- РАМКИ ДЛЯ АВАТАРОК --- */
-/* Золотая */
-.frame-gold {
-  border: 3px solid #FFD700 !important;
-  box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
-}
-
-/* Неоновая */
-.frame-neon {
-  border: 3px solid #00f2fe !important;
-  box-shadow: 0 0 20px #00f2fe, 0 0 10px #4facfe inset;
-}
-
-/* Огненная */
-.frame-fire {
-  border: 3px solid #f12711 !important;
-  box-shadow: 0 0 15px #f12711, 0 0 30px #f5af19;
-  animation: firePulse 2s infinite alternate;
-}
-
-@keyframes firePulse {
-  0% { box-shadow: 0 0 15px #f12711, 0 0 25px #f5af19; }
-  100% { box-shadow: 0 0 25px #f12711, 0 0 45px #f5af19; }
-}
-
-/* --- ФИШКА: МОРОЗНЫЙ ИНЕЙ ПО КРАЯМ ЭКРАНА --- */
-.frost-overlay {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9998;
-  box-shadow: inset 0 0 100px rgba(100, 255, 218, 0.1),
-              inset 0 0 40px rgba(100, 255, 218, 0.05);
-  background: radial-gradient(circle at center, transparent 60%, rgba(10, 25, 47, 0.4) 100%);
-}
-
-/* --- РЕАЛИСТИЧНЫЙ ПЛАВНЫЙ 3D СНЕГ --- */
-.snow-container {
-  position: fixed;
-  top: 0; left: 0; width: 100vw; height: 100vh;
-  pointer-events: none;
-  z-index: 9999;
-  overflow: hidden;
-}
-
-.snow-particle {
+/* --- ФИШКИ ХЭЛЛОУИНА --- */
+[data-theme="halloween"] .bottom-nav-glass::before {
+  content: "";
   position: absolute;
-  top: -20px;
-  background: white;
-  border-radius: 50%;
-  opacity: 0;
-  animation: realisticSnow linear infinite;
-  will-change: transform, opacity;
+  top: -20px; left: 0; right: 0; bottom: 0;
+  background-image: radial-gradient(circle at 10% 10%, transparent 20%, var(--app-text-muted) 21%, transparent 22%),
+                    radial-gradient(circle at 90% 20%, transparent 30%, var(--app-text-muted) 31%, transparent 32%);
+  background-size: 50px 50px;
+  opacity: 0.2;
+  pointer-events: none;
+  z-index: -1;
+}
+[data-theme="halloween"] .chat-bg-cobweb {
+  background-image: url('https://www.transparenttextures.com/patterns/cobweb.png');
+  background-size: 200px;
+  opacity: 0.15;
 }
 
+/* --- ФИШКИ КИБЕРПАНКА --- */
+[data-theme="cyberpunk"] .cyber-glow {
+  box-shadow: 0 0 10px var(--app-accent), inset 0 0 5px var(--app-accent);
+  text-shadow: 0 0 5px var(--app-accent);
+}
+[data-theme="cyberpunk"] .cyber-line {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--app-accent), transparent);
+}
+
+/* --- СНЕГ --- */
+.snow-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999; overflow: hidden; }
+.snow-particle { position: absolute; top: -20px; background: white; border-radius: 50%; opacity: 0; animation: realisticSnow linear infinite; will-change: transform, opacity; }
 @keyframes realisticSnow {
-  0% {
-    transform: translateY(-20px) translateX(0px) rotate(0deg);
-    opacity: 0;
-  }
-  10% {
-    opacity: 0.9;
-  }
-  50% {
-    transform: translateY(50vh) translateX(40px) rotate(180deg);
-  }
-  90% {
-    opacity: 0.9;
-  }
-  100% {
-    transform: translateY(105vh) translateX(-20px) rotate(360deg);
-    opacity: 0;
-  }
-}
-
-/* Паутина для Хэллоуина */
-.spiderweb { 
-  position: fixed; 
-  top: 0; 
-  right: 0; 
-  font-size: 8rem; 
-  opacity: 0.3; 
-  pointer-events: none; 
-  z-index: 0; 
+  0% { transform: translateY(-20px) translateX(0px) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.9; }
+  50% { transform: translateY(50vh) translateX(40px) rotate(180deg); }
+  90% { opacity: 0.9; }
+  100% { transform: translateY(105vh) translateX(-20px) rotate(360deg); opacity: 0; }
 }
