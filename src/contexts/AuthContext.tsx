@@ -21,14 +21,22 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
+  
+  // Берем профиль из памяти телефона, если он там есть
+  const [profile, setProfile] = useState<Profile | null>(() => {
+    const cached = localStorage.getItem('cached_profile');
+    return cached ? JSON.parse(cached) : null;
+  });
 
   const fetchProfile = async (uid: string) => {
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
-      if (!error && data) setProfile(data as Profile);
+      if (!error && data) {
+        setProfile(data as Profile);
+        localStorage.setItem('cached_profile', JSON.stringify(data)); // Сохраняем в память
+      }
     } catch (err) {
       console.error("Ошибка профиля:", err);
     }
@@ -37,26 +45,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     
-    // Даем максимум 8 секунд на проверку (на случай совсем плохого интернета)
+    // Защита от вечного зависания: максимум 5 секунд
     const timer = setTimeout(() => {
       if (isMounted) setLoading(false);
-    }, 8000);
+    }, 5000);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
-      
-      // ГЛАВНОЕ ИСПРАВЛЕНИЕ: Отключаем загрузку СРАЗУ, не ждем профиль
-      setLoading(false); 
+      setLoading(false); // Пускаем сразу!
       clearTimeout(timer);
 
       if (session?.user) {
         if (!session.user.email_confirmed_at) {
           setNeedsEmailVerification(true);
         } else {
-          // Профиль грузим в фоне
-          fetchProfile(session.user.id);
+          fetchProfile(session.user.id); // Грузим профиль в фоне
         }
       }
     }).catch(() => {
@@ -75,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setProfile(null);
         setNeedsEmailVerification(false);
+        localStorage.removeItem('cached_profile'); // Очищаем кэш при выходе
       }
     });
 
@@ -123,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setUser(null);
     setSession(null);
+    localStorage.removeItem('cached_profile');
   };
 
   return (
@@ -136,4 +143,4 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
-      }
+}
