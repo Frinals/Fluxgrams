@@ -16,6 +16,18 @@ import CallScreen from '@/components/CallScreen';
 import { useCall } from '@/hooks/useCall';
 import { useNotifications } from '@/hooks/useNotifications';
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) return <div style={{ padding: 20, background: 'red', color: 'white', minHeight: '100vh' }}><h1>Ошибка!</h1><p>{this.state.error?.message}</p></div>;
+    return this.props.children;
+  }
+}
+
 function MessengerApp() {
   const { user, loading, needsEmailVerification } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('chats');
@@ -29,13 +41,11 @@ function MessengerApp() {
   useNotifications();
   const { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute } = useCall();
 
-  const handleStartCall = (peer: any) => startCall(peer);
   const simulateIncoming = () => {
-    const callEvent = new CustomEvent('fakeIncomingCall');
-    window.dispatchEvent(callEvent);
+    window.dispatchEvent(new CustomEvent('fakeIncomingCall'));
   };
 
-  // КРАСИВЫЙ ЭКРАН ЗАГРУЗКИ
+  // Если идет загрузка сессии (проверка пароля)
   if (loading) return (
     <div className="h-[100dvh] flex flex-col items-center justify-center bg-black">
       <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -84,7 +94,7 @@ function MessengerApp() {
             peer={openChat.peer} 
             group={null} 
             onBack={() => setOpenChat(null)} 
-            onCall={() => handleStartCall(openChat.peer)} 
+            onCall={() => startCall(openChat.peer)} 
             onViewProfile={(id: string) => setViewingProfileId(id)} 
           />
         ) : (
@@ -130,12 +140,14 @@ function MessengerApp() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <AuthProvider>
-          <MessengerApp />
-        </AuthProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <MessengerApp />
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
-                                                                                                                    }
+      }
