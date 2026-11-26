@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -16,6 +16,18 @@ import CallScreen from '@/components/CallScreen';
 import { useCall } from '@/hooks/useCall';
 import { useNotifications } from '@/hooks/useNotifications';
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) return <div style={{ padding: 20, background: 'red', color: 'white', minHeight: '100vh' }}><h1>Ошибка!</h1><p>{this.state.error?.message}</p></div>;
+    return this.props.children;
+  }
+}
+
 function MessengerApp() {
   const { user, loading, needsEmailVerification } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('chats');
@@ -29,17 +41,16 @@ function MessengerApp() {
   useNotifications();
   const { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute } = useCall();
 
-  const simulateIncoming = useCallback(() => {
+  const simulateIncoming = () => {
     window.dispatchEvent(new CustomEvent('fakeIncomingCall'));
-  }, []);
+  };
 
-  const handleOpenProfile = useCallback((id: string) => setViewingProfileId(id), []);
-  const handleOpenChat = useCallback((chatId: string, peer: any) => setOpenChat({ chatId, peer }), []);
-
+  // Если идет загрузка сессии (проверка пароля)
   if (loading) return (
-    <div className="h-[100dvh] flex flex-col items-center justify-center" style={{ background: 'var(--app-bg)' }}>
-      <div className="w-12 h-12 border-4 border-t-transparent rounded-full animate-spin mb-4" style={{ borderColor: 'var(--app-accent)', borderTopColor: 'transparent' }}></div>
-      <p className="font-bold text-lg" style={{ color: 'var(--app-text)' }}>Подключение...</p>
+    <div className="h-[100dvh] flex flex-col items-center justify-center bg-black">
+      <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p className="text-white font-bold text-lg">Подключение...</p>
+      <p className="text-gray-500 text-sm mt-2">Проверяем сеть</p>
     </div>
   );
   
@@ -48,6 +59,7 @@ function MessengerApp() {
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden relative" style={{ background: 'var(--app-bg)' }}>
       
+      {/* БАННЕР ЗВОНКА */}
       <AnimatePresence>
         {callState === 'incoming' && (
           <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-4 left-4 right-4 z-[99999] rounded-3xl p-4 shadow-2xl flex items-center justify-between liquid-glass">
@@ -68,6 +80,7 @@ function MessengerApp() {
         )}
       </AnimatePresence>
 
+      {/* ПОЛНОЭКРАННЫЙ ЗВОНОК */}
       <AnimatePresence>
         {(callState === 'calling' || callState === 'active') && (
           <CallScreen callState={callState} peer={remotePeer || { display_name: 'Собеседник' }} isMuted={isMuted} toggleMute={toggleMute} endCall={endCall} />
@@ -82,14 +95,14 @@ function MessengerApp() {
             group={null} 
             onBack={() => setOpenChat(null)} 
             onCall={() => startCall(openChat.peer)} 
-            onViewProfile={handleOpenProfile} 
+            onViewProfile={(id: string) => setViewingProfileId(id)} 
           />
         ) : (
           <>
-            {activeTab === 'chats' && <ChatList onOpenChat={handleOpenChat} onViewProfile={handleOpenProfile} />}
-            {activeTab === 'calls' && <CallsView onTestBanner={simulateIncoming} />}
-            {activeTab === 'feed' && <FeedView onViewProfile={handleOpenProfile} />}
-            {activeTab === 'settings' && <SettingsView onViewProfile={handleOpenProfile} />}
+            {activeTab === 'chats' && <ChatList onOpenChat={(c, p) => setOpenChat({ chatId: c, peer: p })} onViewProfile={(id) => setViewingProfileId(id)} />}
+            {activeTab === 'calls' && <CallsView onTestBanner={simulateIncoming} onOpenChat={(c, p) => setOpenChat({ chatId: c, peer: p })} onViewProfile={(id) => setViewingProfileId(id)} />}
+            {activeTab === 'feed' && <FeedView onViewProfile={(id) => setViewingProfileId(id)} />}
+            {activeTab === 'settings' && <SettingsView onViewProfile={(id) => setViewingProfileId(id)} />}
           </>
         )}
       </div>
@@ -105,7 +118,7 @@ function MessengerApp() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowPostModal(false)}>
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="rounded-3xl p-5 w-full max-w-md liquid-glass" onClick={e => e.stopPropagation()}>
               <h2 className="font-bold text-xl mb-4" style={{ color: 'var(--app-text)' }}>Новый пост</h2>
-              <textarea value={postText} onChange={e => setPostText(e.target.value)} placeholder="О чем думаешь?" className="w-full h-32 p-4 rounded-2xl outline-none border text-[16px]" style={{ background: 'rgba(0,0,0,0.1)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
+              <textarea value={postText} onChange={e => setPostText(e.target.value)} placeholder="О чем думаешь?" className="w-full h-32 p-4 rounded-2xl outline-none border text-[16px]" style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
               <div className="flex gap-3 mt-4">
                 <button onClick={() => setShowPostModal(false)} className="flex-1 py-3 rounded-2xl font-semibold" style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--app-text)' }}>Отмена</button>
                 <button onClick={async () => {
