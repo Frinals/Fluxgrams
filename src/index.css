@@ -2,36 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
+/* --- БАЗОВЫЕ ПЕРЕМЕННЫЕ --- */
 :root {
   --app-bg: #0f1115;
-  --app-surface: rgba(30, 34, 42, 0.4);
+  --app-surface: rgba(30, 34, 42, 0.8);
   --app-text: #ffffff;
   --app-text-muted: #8892a0;
-  --app-border: rgba(255, 255, 255, 0.15);
-  --app-accent: #3b82f6;
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-border-glass: rgba(255, 255, 255, 0.15);
+  --app-accent: #ff6b6b;
+  --app-accent-gradient: linear-gradient(135deg, #ff6b6b, #ee5a24);
+  --app-danger: #ef4444;
+  --app-success: #2ecc71;
+  --app-bubbleSentText: #ffffff;
+  --app-bubbleRecvText: #ffffff;
+  --app-nav-bg: rgba(15, 17, 21, 0.85);
+  --app-glow: #ee5a24;
 }
 
 [data-theme="light"] {
   --app-bg: #f5f6f8;
-  --app-surface: rgba(255, 255, 255, 0.6);
+  --app-surface: rgba(255, 255, 255, 0.9);
   --app-text: #111111;
   --app-text-muted: #6b7280;
   --app-border: rgba(0, 0, 0, 0.1);
-  --app-accent: #2563eb;
+  --app-border-glass: rgba(0, 0, 0, 0.08);
+  --app-accent: #ff6b6b;
+  --app-nav-bg: rgba(255, 255, 255, 0.9);
+  --app-bubbleSentText: #ffffff;
+  --app-bubbleRecvText: #111111;
+}
+
+[data-theme="neon"] {
+  --app-bg: #050510;
+  --app-surface: rgba(20, 20, 40, 0.8);
+  --app-text: #00ffff;
+  --app-text-muted: #0088cc;
+  --app-border: rgba(0, 255, 255, 0.3);
+  --app-accent: #ff00ff;
+  --app-accent-gradient: linear-gradient(135deg, #ff00ff, #00ffff);
+  --app-glow: #ff00ff;
 }
 
 [data-theme="halloween"] {
   --app-bg: #0a0505;
-  --app-surface: rgba(30, 10, 10, 0.5);
+  --app-surface: rgba(30, 10, 10, 0.7);
   --app-text: #ff9900;
   --app-text-muted: #cc5500;
-  --app-border: rgba(255, 153, 0, 0.3);
+  --app-border: rgba(255, 153, 0, 0.2);
   --app-accent: #ff5500;
 }
 
 [data-theme="cyberpunk"] {
   --app-bg: #050510;
-  --app-surface: rgba(15, 0, 30, 0.5);
+  --app-surface: rgba(15, 0, 30, 0.8);
   --app-text: #00f0ff;
   --app-text-muted: #ff007f;
   --app-border: rgba(255, 0, 127, 0.4);
@@ -40,38 +64,51 @@
 
 [data-theme="new_year"] {
   --app-bg: #0a192f;
-  --app-surface: rgba(17, 34, 64, 0.5);
+  --app-surface: rgba(17, 34, 64, 0.7);
   --app-text: #ffffff;
   --app-text-muted: #8892b0;
-  --app-border: rgba(35, 53, 84, 0.6);
+  --app-border: rgba(35, 53, 84, 0.5);
   --app-accent: #64ffda;
 }
 
+/* --- ГЛОБАЛЬНЫЕ СТИЛИ --- */
 body {
   margin: 0;
   padding: 0;
   background-color: var(--app-bg);
   color: var(--app-text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow: hidden;
-  overscroll-behavior-y: none;
+  overscroll-behavior-y: none; /* Убирает отскок */
 }
 
-/* --- LIQUID GLASS (ЖИДКОЕ СТЕКЛО) --- */
+/* --- ТВОИ СТЕКЛЯННЫЕ ПАНЕЛИ --- */
+.glass-panel {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 24px;
+}
+
+.glass-nav {
+  background: var(--app-nav-bg);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+}
+
+/* --- НОВОЕ: LIQUID GLASS (ЖИДКОЕ СТЕКЛО) --- */
 .liquid-glass {
   background: var(--app-surface);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--app-border);
   box-shadow: 
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.2), /* Блик сверху */
-    inset 0 -1px 0 0 rgba(255, 255, 255, 0.05), /* Тень снизу */
-    0 8px 32px 0 rgba(0, 0, 0, 0.3); /* Внешняя тень */
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.05),
+    0 8px 32px 0 rgba(0, 0, 0, 0.3);
   position: relative;
   overflow: hidden;
 }
 
-/* Эффект преломления и дополнительного блика */
 .liquid-glass::before {
   content: '';
   position: absolute;
@@ -80,27 +117,48 @@ body {
   pointer-events: none;
 }
 
-/* --- ПАУТИНА (ТОЛЬКО СВЕРХУ) --- */
-.chat-bg-cobweb::before {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 150px; /* Высота паутины */
-  background-image: url('https://www.transparenttextures.com/patterns/cobweb.png');
-  background-size: cover;
-  background-position: top center;
-  opacity: 0.2;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* --- ОПТИМИЗАЦИЯ И ПЛАВНОСТЬ --- */
+/* --- ПЛАВНОСТЬ И СКРОЛЛ --- */
 * { -webkit-tap-highlight-color: transparent; }
+.scroll-smooth-touch { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .overflow-y-auto { -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-thumb { background: var(--app-border); border-radius: 4px; }
 
-/* --- СНЕГ --- */
+/* Скрываем старые квадраты */
+.liquid-orb { display: none !important; }
+
+/* --- ШРИФТЫ --- */
+.font-default { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+.font-serif { font-family: 'Georgia', serif; font-style: italic; }
+.font-mono { font-family: 'Courier New', monospace; letter-spacing: -1px; }
+.font-bold-caps { text-transform: uppercase; letter-spacing: 2px; font-weight: 900; }
+
+/* --- РАМКИ ДЛЯ АВАТАРОК --- */
+.frame-default { border-color: var(--app-bg); }
+
+.frame-gold {
+  border: 3px solid #FFD700 !important;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+}
+
+.frame-neon {
+  border: 3px solid #00f2fe !important;
+  box-shadow: 0 0 20px #00f2fe, 0 0 10px #4facfe inset;
+}
+
+.frame-fire {
+  border: 3px solid #f12711 !important;
+  box-shadow: 0 0 15px #f12711, 0 0 30px #f5af19, 0 0 45px #f12711;
+  animation: firePulse 2s infinite alternate;
+}
+
+@keyframes firePulse {
+  0% { box-shadow: 0 0 15px #f12711, 0 0 25px #f5af19; }
+  100% { box-shadow: 0 0 25px #f12711, 0 0 45px #f5af19; }
+}
+
+/* --- СНЕГ (НОВЫЙ ГОД) --- */
 .snow-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999; overflow: hidden; }
 .snow-particle { position: absolute; top: -20px; background: white; border-radius: 50%; opacity: 0; animation: realisticSnow linear infinite; will-change: transform, opacity; }
 @keyframes realisticSnow {
@@ -110,3 +168,44 @@ body {
   90% { opacity: 0.9; }
   100% { transform: translateY(105vh) translateX(-20px) rotate(360deg); opacity: 0; }
 }
+
+/* --- ПАУТИНА ДЛЯ ХЭЛЛОУИНА --- */
+.spiderweb { position: fixed; top: 0; right: 0; font-size: 8rem; opacity: 0.3; pointer-events: none; z-index: 0; }
+
+/* --- РЕАЛИСТИЧНАЯ ПАУТИНА В ЧАТЕ (ТЕМА ХЭЛЛОУИН) --- */
+.chat-cobweb-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  display: none;
+  overflow: hidden;
+}
+
+[data-theme="halloween"] .chat-cobweb-overlay {
+  display: block;
+}
+
+.cobweb-corner {
+  position: absolute;
+  width: 250px;
+  height: 250px;
+  background-image: url('data:image/svg+xml;utf8,<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L200 200 M0 0 L200 0 M0 0 L0 200 M0 0 L150 200 M0 0 L200 150 M0 0 L100 200 M0 0 L200 100 M0 0 L50 200 M0 0 L200 50" stroke="rgba(255,153,0,0.4)" stroke-width="2"/><path d="M30 0 Q15 15 0 30 M60 0 Q30 30 0 60 M100 0 Q50 50 0 100 M140 0 Q70 70 0 140 M180 0 Q90 90 0 180 M200 30 Q100 100 30 200 M200 60 Q100 130 60 200 M200 100 Q130 160 100 200 M200 140 Q160 180 140 200" stroke="rgba(255,153,0,0.2)" fill="none" stroke-width="1.5"/></svg>');
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.6;
+  animation: swayWeb 8s ease-in-out infinite alternate;
+}
+
+.cobweb-top-left { top: 0; left: 0; transform-origin: top left; }
+.cobweb-top-right { top: 0; right: 0; transform-origin: top right; animation-name: swayWebRight; }
+
+@keyframes swayWeb {
+  0% { transform: rotate(0deg) scale(1); }
+  100% { transform: rotate(4deg) scale(1.05); }
+}
+
+@keyframes swayWebRight {
+  0% { transform: rotate(0deg) scale(1); }
+  100% { transform: rotate(-4deg) scale(1.05); }
+  }
