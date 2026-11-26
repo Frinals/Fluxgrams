@@ -144,6 +144,5 @@ export function useCall() {
     remoteOfferRef.current = null;
   }, [localStream]);
 
-  // ВОТ ТУТ ЗАКРЫВАЕТСЯ ФУНКЦИЯ И ВОЗВРАЩАЮТСЯ ДАННЫЕ
   return { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute };
 }
