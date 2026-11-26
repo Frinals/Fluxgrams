@@ -57,7 +57,7 @@ export function useCall() {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
-  // 2. СЛУШАТЕЛЬ ДЛЯ ТЕСТА БАННЕРА (Тот самый кусок, который сломал сборку)
+  // 2. СЛУШАТЕЛЬ ДЛЯ ТЕСТА БАННЕРА
   useEffect(() => {
     const handleFakeCall = () => {
       setRemotePeer({ display_name: 'Тестовый Пользователь' });
@@ -144,6 +144,6 @@ export function useCall() {
     remoteOfferRef.current = null;
   }, [localStream]);
 
-  // ВОТ ТУТ ДОЛЖЕН БЫТЬ RETURN (ВНУТРИ ФУНКЦИИ!)
+  // ВОТ ТУТ ЗАКРЫВАЕТСЯ ФУНКЦИЯ И ВОЗВРАЩАЮТСЯ ДАННЫЕ
   return { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute };
 }
