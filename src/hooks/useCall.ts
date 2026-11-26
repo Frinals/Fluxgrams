@@ -144,3 +144,14 @@ export function useCall() {
 
   return { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute };
 }
+// Внутри useCall, перед return добавь слушатель фейкового звонка:
+useEffect(() => {
+  const handleFakeCall = () => {
+    setRemotePeer({ display_name: 'Тестовый Пользователь' });
+    setCallState('incoming');
+  };
+  window.addEventListener('fakeIncomingCall', handleFakeCall);
+  return () => window.removeEventListener('fakeIncomingCall', handleFakeCall);
+}, []);
+
+return { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute };
