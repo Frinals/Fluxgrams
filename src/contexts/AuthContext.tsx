@@ -24,7 +24,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
   
-  // Берем профиль из памяти телефона, если он там есть
   const [profile, setProfile] = useState<Profile | null>(() => {
     const cached = localStorage.getItem('cached_profile');
     return cached ? JSON.parse(cached) : null;
@@ -35,38 +34,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
       if (!error && data) {
         setProfile(data as Profile);
-        localStorage.setItem('cached_profile', JSON.stringify(data)); // Сохраняем в память
+        localStorage.setItem('cached_profile', JSON.stringify(data));
       }
-    } catch (err) {
-      console.error("Ошибка профиля:", err);
-    }
+    } catch (err) { console.error("Ошибка профиля:", err); }
   };
 
   useEffect(() => {
     let isMounted = true;
     
-    // Защита от вечного зависания: максимум 5 секунд
+    // ЖЕСТКИЙ ТАЙМЕР НА 3 СЕКУНДЫ ДЛЯ МОБИЛЬНОГО ИНТЕРНЕТА
     const timer = setTimeout(() => {
-      if (isMounted) setLoading(false);
-    }, 5000);
+      if (isMounted) {
+        console.warn("Медленный интернет. Принудительный запуск.");
+        setLoading(false);
+      }
+    }, 3000);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(false); // Пускаем сразу!
+      setLoading(false);
       clearTimeout(timer);
 
       if (session?.user) {
-        if (!session.user.email_confirmed_at) {
-          setNeedsEmailVerification(true);
-        } else {
-          fetchProfile(session.user.id); // Грузим профиль в фоне
-        }
+        if (!session.user.email_confirmed_at) setNeedsEmailVerification(true);
+        else fetchProfile(session.user.id);
       }
     }).catch(() => {
-      if (isMounted) setLoading(false);
-      clearTimeout(timer);
+      if (isMounted) { setLoading(false); clearTimeout(timer); }
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -75,42 +71,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       setLoading(false);
       
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-        setNeedsEmailVerification(false);
-        localStorage.removeItem('cached_profile'); // Очищаем кэш при выходе
-      }
+      if (session?.user) fetchProfile(session.user.id);
+      else { setProfile(null); setNeedsEmailVerification(false); localStorage.removeItem('cached_profile'); }
     });
 
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-      listener.subscription.unsubscribe();
-    };
+    return () => { isMounted = false; clearTimeout(timer); listener.subscription.unsubscribe(); };
   }, []);
 
-  const refreshProfile = async () => {
-    if (user) await fetchProfile(user.id);
-  };
+  const refreshProfile = async () => { if (user) await fetchProfile(user.id); };
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
-    if (data.user && !data.user.email_confirmed_at) {
-      setNeedsEmailVerification(true);
-      return { error: null, needsVerification: true };
-    }
+    if (data.user && !data.user.email_confirmed_at) { setNeedsEmailVerification(true); return { error: null, needsVerification: true }; }
     return { error: null };
   };
 
   const signUp = async (email: string, password: string, username: string, displayName: string) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return { error: error.message };
-    if (data.user) {
-      await supabase.from('profiles').insert({ id: data.user.id, username, display_name: displayName });
-    }
+    if (data.user) await supabase.from('profiles').insert({ id: data.user.id, username, display_name: displayName });
     return { error: null };
   };
 
@@ -126,10 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    setProfile(null);
-    setUser(null);
-    setSession(null);
-    localStorage.removeItem('cached_profile');
+    setProfile(null); setUser(null); setSession(null); localStorage.removeItem('cached_profile');
   };
 
   return (
