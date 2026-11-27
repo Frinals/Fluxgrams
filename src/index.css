@@ -1,51 +1,99 @@
-/* --- РЕАЛИСТИЧНАЯ ПАУТИНА НА ВЕСЬ ЭКРАН (ХЭЛЛОУИН) --- */
-.chat-cobweb-overlay {
-  position: absolute; 
-  inset: 0; 
-  pointer-events: none; 
-  z-index: 0; 
-  display: none; 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --app-bg: #0f1115;
+  --app-surface: rgba(30, 34, 42, 0.6);
+  --app-text: #ffffff;
+  --app-text-muted: #8892a0;
+  --app-border: rgba(255, 255, 255, 0.15);
+  --app-accent: #3b82f6;
+}
+
+[data-theme="light"] {
+  --app-bg: #f5f6f8; --app-surface: rgba(255, 255, 255, 0.7); --app-text: #111111; --app-text-muted: #6b7280; --app-border: rgba(0,0,0,0.1); --app-accent: #2563eb;
+}
+[data-theme="violet"] {
+  --app-bg: #0b0312; --app-surface: rgba(60, 20, 100, 0.5); --app-text: #ffffff; --app-text-muted: #b58bff; --app-border: rgba(180, 100, 255, 0.3); --app-accent: #8b5cf6;
+}
+[data-theme="halloween"] {
+  --app-bg: #0a0505; --app-surface: rgba(40, 15, 10, 0.6); --app-text: #ff9900; --app-text-muted: #cc5500; --app-border: rgba(255,153,0,0.2); --app-accent: #ff5500;
+}
+[data-theme="cyberpunk"] {
+  --app-bg: #050510; --app-surface: rgba(15, 0, 30, 0.6); --app-text: #00f0ff; --app-text-muted: #ff007f; --app-border: rgba(255,0,127,0.4); --app-accent: #ff007f;
+}
+[data-theme="new_year"] {
+  --app-bg: #0a192f; --app-surface: rgba(17, 34, 64, 0.6); --app-text: #ffffff; --app-text-muted: #8892b0; --app-border: rgba(35,53,84,0.5); --app-accent: #64ffda;
+}
+
+body {
+  margin: 0; padding: 0; background-color: var(--app-bg); color: var(--app-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden; overscroll-behavior-y: none;
+}
+
+/* --- ЖИДКОЕ СТЕКЛО --- */
+.liquid-glass {
+  background: var(--app-surface);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid var(--app-border);
+  box-shadow: inset 0 2px 5px rgba(255, 255, 255, 0.3), inset 0 -2px 5px rgba(0, 0, 0, 0.4), 0 8px 32px rgba(0, 0, 0, 0.3);
+  position: relative;
   overflow: hidden;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+
+.liquid-glass:active {
+  transform: scale(0.92);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), inset 0 -1px 2px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.liquid-glass::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 40%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, transparent 100%);
+  pointer-events: none; border-radius: inherit;
+}
+
+/* --- РЕАЛИСТИЧНАЯ ПАУТИНА В ЧАТЕ --- */
+.chat-cobweb-overlay {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0; display: none; overflow: hidden;
 }
 
 [data-theme="halloween"] .chat-cobweb-overlay {
   display: block;
 }
 
-/* Сама паутина */
-.cobweb-full {
+.cobweb {
   position: absolute;
-  top: -5%; left: -5%; right: -5%; bottom: -5%; /* Чуть больше экрана, чтобы при покачивании не было краев */
-  opacity: 0.35; /* Прозрачность, чтобы не мешала читать */
-  
-  /* Сложный SVG паттерн настоящей паутины (растягивается на 100% площади) */
-  background-image: url('data:image/svg+xml;utf8,<svg preserveAspectRatio="none" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" stroke="%23ff9900" fill="none" stroke-width="0.3"><path d="M0,0 L100,100 M0,0 L100,0 M0,0 L0,100 M0,0 L75,100 M0,0 L100,75 M0,0 L40,100 M0,0 L100,40 M0,0 L20,100 M0,0 L100,20 M0,0 L60,100 M0,0 L100,60"/><path d="M10,0 Q5,5 0,10 M25,0 Q12.5,12.5 0,25 M45,0 Q22.5,22.5 0,45 M70,0 Q35,35 0,70 M100,10 Q50,50 10,100 M100,25 Q50,62.5 25,100 M100,45 Q55,77.5 45,100 M100,70 Q65,85 70,100"/><path d="M5,0 Q2.5,2.5 0,5 M15,0 Q7.5,7.5 0,15 M35,0 Q17.5,17.5 0,35 M55,0 Q27.5,27.5 0,55 M85,0 Q42.5,42.5 0,85"/></svg>');
-  background-size: 100% 100%;
-  background-position: center;
-  background-repeat: no-repeat;
-  
-  /* Плавное покачивание на ветру */
-  animation: webSway 10s ease-in-out infinite alternate;
-  will-change: transform;
+  width: 400px; height: 400px; /* Сделали больше */
+  background-size: contain; background-repeat: no-repeat;
+  opacity: 0.4;
+  /* НАСТОЯЩИЙ SVG ПАУТИНЫ (спираль с изгибами) */
+  background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" stroke="rgba(255,150,0,0.6)" fill="none" stroke-width="1.5"><path d="M0,0 L200,200 M0,0 L200,0 M0,0 L0,200 M0,0 L150,200 M0,0 L200,150 M0,0 L100,200 M0,0 L200,100 M0,0 L50,200 M0,0 L200,50"/><path d="M30,0 Q15,15 0,30 M60,0 Q30,30 0,60 M100,0 Q50,50 0,100 M140,0 Q70,70 0,140 M180,0 Q90,90 0,180 M200,30 Q100,100 30,200 M200,60 Q100,130 60,200 M200,100 Q130,160 100,200 M200,140 Q160,180 140,200 M200,180 Q180,190 180,200"/><path d="M10,0 Q10,10 0,10 M20,0 Q20,20 0,20 M45,0 Q45,45 0,45 M75,0 Q75,75 0,75 M120,0 Q120,120 0,120"/></svg>');
+  /* Плавное покачивание ветром */
+  animation: windSway 8s ease-in-out infinite alternate;
+  transform-origin: top left;
 }
 
-/* Маленький паучок в углу (просто для атмосферы) */
-.spider {
-  position: absolute;
-  top: 10px; right: 20px;
-  font-size: 24px;
-  opacity: 0.8;
-  animation: spiderHang 4s ease-in-out infinite alternate;
-  transform-origin: top center;
-}
+.cobweb-top-left { top: -20px; left: -20px; }
+.cobweb-top-right { top: -20px; right: -20px; transform-origin: top right; animation-name: windSwayRight; }
 
-@keyframes webSway {
+@keyframes windSway {
   0% { transform: rotate(0deg) scale(1); }
-  50% { transform: rotate(1.5deg) scale(1.02); }
+  50% { transform: rotate(3deg) scale(1.02); }
   100% { transform: rotate(0deg) scale(1); }
 }
 
-@keyframes spiderHang {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(15px); } /* Паучок медленно спускается и поднимается */
+@keyframes windSwayRight {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(-3deg) scale(1.02); }
+  100% { transform: rotate(0deg) scale(1); }
 }
+
+/* --- ПЛАВНОСТЬ --- */
+* { -webkit-tap-highlight-color: transparent; }
+.overflow-y-auto { -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--app-border); border-radius: 4px; }
