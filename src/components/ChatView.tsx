@@ -22,7 +22,6 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
     const { data } = await query;
     
     if (data) {
-      // Фильтруем те, что мы удалили у себя
       const visibleMsgs = data.filter(m => !m.deleted_for?.includes(user?.id));
       setMessages(visibleMsgs);
     }
@@ -80,16 +79,14 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
     await supabase.from('messages').insert({ sender_id: user.id, content: file.name, media_url: data.publicUrl, media_type: type, chat_id: chatId, group_id: group?.id });
   };
 
-  // УДАЛЕНИЕ У СЕБЯ
   const deleteForMe = async () => {
     if (!selectedMsg || !user) return;
     const currentDeletedFor = selectedMsg.deleted_for || [];
     await supabase.from('messages').update({ deleted_for: [...currentDeletedFor, user.id] }).eq('id', selectedMsg.id);
-    setMessages(prev => prev.filter(m => m.id !== selectedMsg.id)); // Мгновенно скрываем
+    setMessages(prev => prev.filter(m => m.id !== selectedMsg.id)); 
     setSelectedMsg(null);
   };
 
-  // УДАЛЕНИЕ У ВСЕХ
   const deleteForEveryone = async () => {
     if (!selectedMsg) return;
     await supabase.from('messages').update({ is_deleted: true, content: 'Сообщение удалено', media_url: null }).eq('id', selectedMsg.id);
@@ -110,7 +107,15 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
         <button onClick={() => onCall && onCall(peer)} className="p-2 rounded-full active:scale-90 transition-transform" style={{ color: 'var(--app-accent)' }}><PhoneIcon size={22} /></button>
       </div>
 
+      {/* ЗОНА СООБЩЕНИЙ С ПАУТИНОЙ НА ФОНЕ */}
       <div className="flex-1 overflow-y-auto p-4 relative">
+        
+        {/* ВОТ ЗДЕСЬ ПАУТИНА НА ВЕСЬ ЭКРАН */}
+        <div className="chat-cobweb-overlay">
+          <div className="cobweb-full"></div>
+          <div className="spider">🕷️</div>
+        </div>
+
         <div className="flex flex-col gap-2 relative z-10">
           {messages.map(msg => (
             <div key={msg.id} className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
@@ -129,7 +134,6 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
         </div>
       </div>
 
-      {/* МЕНЮ ДЕЙСТВИЙ С СООБЩЕНИЕМ */}
       <AnimatePresence>
         {selectedMsg && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedMsg(null)}>
