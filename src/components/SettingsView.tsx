@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { themes, useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
-import { BackIcon, ImageIcon, PlayIcon, VerifiedIcon, LockIcon, BellIcon, LeafIcon, MusicIcon } from '@/components/Icons';
+import { BackIcon, ImageIcon, PlayIcon, VerifiedIcon, LockIcon, BellIcon, LeafIcon, MusicIcon, ChevronRightIcon } from '@/components/Icons';
 import MusicPlayer from './MusicPlayer';
 import { AnimatePresence } from 'framer-motion';
 
@@ -70,26 +70,27 @@ export default function SettingsView({ onViewProfile }: any) {
     setIsSaving(false);
   };
 
-  // ЛОГИКА ПОКУПКИ СТУДИИ
+  // ЛОГИКА ПОКУПКИ СТУДИИ (Используем leaf_balance)
   const handleBuyStudio = async () => {
     if (!user || !profile) return;
     
-    const currentLeaves = profile.leaves || 0;
-    if (currentLeaves < 80) {
+    const currentBalance = (profile as any).leaf_balance || 0;
+    if (currentBalance < 80) {
       showError('Недостаточно средств (Нужно 80 🍃)');
       return;
     }
 
     setIsSaving(true);
     const { error } = await supabase.from('profiles').update({
-      leaves: currentLeaves - 80,
-      has_studio_access: true // Сохраняем навсегда!
+      leaf_balance: currentBalance - 80,
+      has_studio_access: true 
     }).eq('id', user.id);
 
     if (error) {
       showError('Ошибка при покупке: ' + error.message);
     } else {
       await refreshProfile();
+      alert('Доступ к Студии открыт навсегда!');
     }
     setIsSaving(false);
   };
@@ -113,16 +114,9 @@ export default function SettingsView({ onViewProfile }: any) {
 
       const { data } = supabase.storage.from('media').getPublicUrl(fileName);
       
-      const newStudioSong = { 
-        title: songTitle.trim(), 
-        artist: songArtist.trim(), 
-        url: data.publicUrl 
-      };
+      const newStudioSong = { title: songTitle.trim(), artist: songArtist.trim(), url: data.publicUrl };
       
-      const { error: updateError } = await supabase.from('profiles').update({ 
-        studio_song: newStudioSong 
-      }).eq('id', user.id);
-
+      const { error: updateError } = await supabase.from('profiles').update({ studio_song: newStudioSong }).eq('id', user.id);
       if (updateError) throw updateError;
       
       await refreshProfile();
@@ -135,16 +129,16 @@ export default function SettingsView({ onViewProfile }: any) {
   };
 
   const settingsList = [
-    { key: 'studio', icon: MusicIcon, label: 'Студия', desc: 'Загрузить свой трек (1 раз)' }, // <-- НОВЫЙ ПУНКТ
+    { key: 'studio', icon: MusicIcon, label: 'Студия', desc: 'Загрузить свой трек (1 раз)' },
     { key: 'currency', icon: LeafIcon, label: 'Валюта', desc: 'Баланс листиков' },
     { key: 'privacy', icon: LockIcon, label: 'Приватность', desc: 'Кто может писать' },
     { key: 'notifications', icon: BellIcon, label: 'Уведомления', desc: 'Звуки и вибрация' },
+    { key: 'appearance', icon: LockIcon, label: 'Оформление', desc: 'Темы приложения' },
   ];
 
   return (
     <div className="flex flex-col h-full overflow-y-auto relative" style={{ background: 'var(--app-bg)' }}>
       
-      {/* Модалка ошибок */}
       {showErrorModal && (
         <div className="fixed inset-0 z-[99999] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="rounded-3xl p-6 w-full max-w-xs text-center liquid-glass">
@@ -165,11 +159,13 @@ export default function SettingsView({ onViewProfile }: any) {
           </div>
 
           <div className="px-4 flex flex-col items-center -mt-14 relative z-10">
-            <div className="relative">
+            
+            {/* ВОЗВРАЩАЕМ ПРОСМОТР ПРОФИЛЯ ПРИ КЛИКЕ НА АВАТАРКУ */}
+            <div className="relative cursor-pointer" onClick={() => onViewProfile(profile?.id)}>
               <div className="w-28 h-28 rounded-full border-4 overflow-hidden flex items-center justify-center text-4xl text-white font-bold liquid-glass" style={{ borderColor: 'var(--app-bg)' }}>
                 {profile?.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" /> : profile?.display_name?.[0] || 'U'}
               </div>
-              <button onClick={() => avatarInputRef.current?.click()} className="absolute bottom-0 right-0 p-2 rounded-full text-white liquid-glass">
+              <button onClick={(e) => { e.stopPropagation(); avatarInputRef.current?.click(); }} className="absolute bottom-0 right-0 p-2 rounded-full text-white liquid-glass">
                 <ImageIcon size={16} />
               </button>
               <input type="file" ref={avatarInputRef} hidden accept="image/*" onChange={(e) => handleImageUpload(e, 'avatar')} />
@@ -178,18 +174,30 @@ export default function SettingsView({ onViewProfile }: any) {
             <div className="text-center mt-3">
               <div className="flex items-center justify-center gap-1">
                 <h2 className="text-2xl font-bold" style={{ color: 'var(--app-text)' }}>{profile?.display_name || 'Пользователь'}</h2>
-                {profile?.is_verified && <VerifiedIcon size={20} className="text-green-500" />}
+                {(profile as any)?.is_verified && <VerifiedIcon size={20} className="text-green-500" />}
               </div>
               <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>@{profile?.username || 'user'}</p>
             </div>
 
-            {/* БАЛАНС ЛИСТИКОВ */}
-            <div className="w-full max-w-md mt-6 p-4 rounded-3xl liquid-glass flex items-center justify-between">
+            {/* ВОЗВРАЩАЕМ КНОПКУ РЕДАКТИРОВАНИЯ */}
+            <button onClick={() => setSubPage('edit_profile')} className="w-full max-w-md mt-6 p-4 rounded-2xl liquid-glass flex items-center justify-between">
+               <div className="flex items-center gap-3">
+                 <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white" style={{ background: 'var(--app-accent)' }}><ImageIcon size={20} /></div>
+                 <div className="text-left">
+                   <span className="font-semibold block text-[15px]" style={{ color: 'var(--app-text)' }}>Аккаунты</span>
+                   <span className="text-xs block" style={{ color: 'var(--app-text-muted)' }}>Имя, юзернейм</span>
+                 </div>
+               </div>
+               <ChevronRightIcon size={20} style={{ color: 'var(--app-text-muted)' }} />
+            </button>
+
+            {/* БАЛАНС ИСПРАВЛЕН (leaf_balance) */}
+            <div className="w-full max-w-md mt-2 p-4 rounded-3xl liquid-glass flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl bg-green-500/20">🍃</div>
                 <div>
                   <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>Ваш баланс</p>
-                  <p className="font-bold text-xl" style={{ color: 'var(--app-text)' }}>{profile?.leaves || 0} листиков</p>
+                  <p className="font-bold text-xl" style={{ color: 'var(--app-text)' }}>{(profile as any)?.leaf_balance || 0} листиков</p>
                 </div>
               </div>
             </div>
@@ -210,83 +218,7 @@ export default function SettingsView({ onViewProfile }: any) {
         </div>
       )}
 
-      {/* ЭКРАН СТУДИИ */}
-      {subPage === 'studio' && (
-        <div className="p-4 pb-24">
-          <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
-          
-          <div className="text-center mb-6">
-            <div className="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl bg-purple-500/20 text-purple-500 mb-3">
-              🎙️
-            </div>
-            <h2 className="text-2xl font-bold" style={{ color: 'var(--app-text)' }}>Flux Studio</h2>
-            <p className="text-sm mt-1" style={{ color: 'var(--app-text-muted)' }}>Загрузи свой трек один раз и навсегда</p>
-          </div>
-
-          {/* ЕСЛИ ДОСТУПА НЕТ */}
-          {!profile?.has_studio_access ? (
-            <div className="p-6 rounded-3xl liquid-glass text-center">
-              <h3 className="font-bold text-lg mb-2" style={{ color: 'var(--app-text)' }}>Доступ закрыт</h3>
-              <p className="text-sm mb-6" style={{ color: 'var(--app-text-muted)' }}>Купите бессрочный доступ к студии, чтобы выложить свою музыку.</p>
-              
-              <div className="flex flex-col items-center gap-3">
-                <div className="flex items-center gap-2 text-2xl font-bold" style={{ color: 'var(--app-text)' }}>
-                  <span>🍃</span> 80 листиков
-                </div>
-                <button onClick={handleBuyStudio} disabled={isSaving} className="w-full py-4 rounded-2xl font-bold text-white active:scale-95 transition-transform" style={{ background: 'var(--app-accent)' }}>
-                  {isSaving ? 'Покупка...' : 'Купить доступ'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* ЕСЛИ ДОСТУП ЕСТЬ */
-            <div className="p-6 rounded-3xl liquid-glass">
-              
-              {/* Если песня УЖЕ загружена (показываем её, форму скрываем) */}
-              {profile?.studio_song ? (
-                <div className="text-center">
-                  <h3 className="font-bold text-lg mb-4" style={{ color: 'var(--app-text)' }}>Ваш трек в Студии</h3>
-                  <div className="p-4 rounded-2xl bg-black/20 mb-4 flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center text-white" style={{ background: 'var(--app-accent)' }}><PlayIcon size={24} /></div>
-                    <div className="text-left flex-1">
-                      <p className="font-bold text-[16px]" style={{ color: 'var(--app-text)' }}>{profile.studio_song.title}</p>
-                      <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>{profile.studio_song.artist}</p>
-                    </div>
-                  </div>
-                  <audio controls src={profile.studio_song.url} className="w-full" />
-                  <p className="text-xs text-red-400 mt-4">Вы уже использовали свой шанс. Изменить трек нельзя.</p>
-                </div>
-              ) : (
-                /* Если песни еще нет (показываем форму) */
-                <div className="space-y-4">
-                  <h3 className="font-bold text-lg mb-4" style={{ color: 'var(--app-text)' }}>Загрузка трека</h3>
-                  
-                  <div>
-                    <label className="block text-sm mb-1" style={{ color: 'var(--app-text-muted)' }}>Название песни</label>
-                    <input type="text" value={songTitle} onChange={e => setSongTitle(e.target.value)} className="w-full p-3 rounded-xl outline-none liquid-glass" style={{ color: 'var(--app-text)' }} placeholder="Например: Тёмный принц" />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm mb-1" style={{ color: 'var(--app-text-muted)' }}>Исполнитель</label>
-                    <input type="text" value={songArtist} onChange={e => setSongArtist(e.target.value)} className="w-full p-3 rounded-xl outline-none liquid-glass" style={{ color: 'var(--app-text)' }} placeholder="Ваш никнейм" />
-                  </div>
-
-                  <div className="pt-2">
-                    <button onClick={() => studioAudioRef.current?.click()} disabled={isUploadingStudio} className="w-full py-4 rounded-xl font-bold text-white liquid-glass disabled:opacity-50" style={{ background: 'var(--app-accent)' }}>
-                      {isUploadingStudio ? 'Загрузка...' : 'Выбрать файл и загрузить'}
-                    </button>
-                    <input type="file" ref={studioAudioRef} hidden accept="audio/*" onChange={handleStudioUpload} />
-                  </div>
-                  
-                  <p className="text-xs text-center text-red-400 mt-2">Внимание! Вы можете загрузить только 1 трек за всё время.</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ОСТАЛЬНЫЕ ЭКРАНЫ (Профиль, Темы, Приватность) */}
+      {/* ОСТАЛЬНЫЕ ЭКРАНЫ (Профиль, Темы, Студия) оставляем как было, они работали */}
       {subPage === 'edit_profile' && (
         <div className="p-4 pb-24">
           <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
@@ -296,6 +228,60 @@ export default function SettingsView({ onViewProfile }: any) {
             <div><label className="block text-sm mb-1" style={{ color: 'var(--app-text-muted)' }}>Юзернейм (@)</label><input type="text" value={editUsername} onChange={e => setEditUsername(e.target.value)} className="w-full p-4 rounded-2xl outline-none liquid-glass" style={{ color: 'var(--app-text)' }} /></div>
             <button onClick={handleSaveProfile} disabled={isSaving} className="w-full py-4 rounded-2xl font-bold text-white mt-6 active:scale-95 transition-transform liquid-glass" style={{ background: 'var(--app-accent)' }}>Сохранить</button>
           </div>
+        </div>
+      )}
+
+      {subPage === 'studio' && (
+        <div className="p-4 pb-24">
+          <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
+          <div className="text-center mb-6">
+            <div className="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl bg-purple-500/20 text-purple-500 mb-3">🎙️</div>
+            <h2 className="text-2xl font-bold" style={{ color: 'var(--app-text)' }}>Flux Studio</h2>
+            <p className="text-sm mt-1" style={{ color: 'var(--app-text-muted)' }}>Загрузи свой трек один раз и навсегда</p>
+          </div>
+
+          {!(profile as any)?.has_studio_access ? (
+            <div className="p-6 rounded-3xl liquid-glass text-center">
+              <h3 className="font-bold text-lg mb-2" style={{ color: 'var(--app-text)' }}>Доступ закрыт</h3>
+              <p className="text-sm mb-6" style={{ color: 'var(--app-text-muted)' }}>Купите бессрочный доступ к студии, чтобы выложить свою музыку.</p>
+              <div className="flex flex-col items-center gap-3">
+                <div className="flex items-center gap-2 text-2xl font-bold" style={{ color: 'var(--app-text)' }}><span>🍃</span> 80 листиков</div>
+                <button onClick={handleBuyStudio} disabled={isSaving} className="w-full py-4 rounded-2xl font-bold text-white active:scale-95 transition-transform" style={{ background: 'var(--app-accent)' }}>
+                  {isSaving ? 'Покупка...' : 'Купить доступ'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 rounded-3xl liquid-glass">
+              {(profile as any)?.studio_song ? (
+                <div className="text-center">
+                  <h3 className="font-bold text-lg mb-4" style={{ color: 'var(--app-text)' }}>Ваш трек в Студии</h3>
+                  <div className="p-4 rounded-2xl bg-black/20 mb-4 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center text-white" style={{ background: 'var(--app-accent)' }}><PlayIcon size={24} /></div>
+                    <div className="text-left flex-1">
+                      <p className="font-bold text-[16px]" style={{ color: 'var(--app-text)' }}>{(profile as any).studio_song.title}</p>
+                      <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>{(profile as any).studio_song.artist}</p>
+                    </div>
+                  </div>
+                  <audio controls src={(profile as any).studio_song.url} className="w-full" />
+                  <p className="text-xs text-red-400 mt-4">Вы уже использовали свой шанс. Изменить трек нельзя.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <h3 className="font-bold text-lg mb-4" style={{ color: 'var(--app-text)' }}>Загрузка трека</h3>
+                  <div><label className="block text-sm mb-1" style={{ color: 'var(--app-text-muted)' }}>Название песни</label><input type="text" value={songTitle} onChange={e => setSongTitle(e.target.value)} className="w-full p-3 rounded-xl outline-none liquid-glass" style={{ color: 'var(--app-text)' }} placeholder="Например: Тёмный принц" /></div>
+                  <div><label className="block text-sm mb-1" style={{ color: 'var(--app-text-muted)' }}>Исполнитель</label><input type="text" value={songArtist} onChange={e => setSongArtist(e.target.value)} className="w-full p-3 rounded-xl outline-none liquid-glass" style={{ color: 'var(--app-text)' }} placeholder="Ваш никнейм" /></div>
+                  <div className="pt-2">
+                    <button onClick={() => studioAudioRef.current?.click()} disabled={isUploadingStudio} className="w-full py-4 rounded-xl font-bold text-white liquid-glass disabled:opacity-50" style={{ background: 'var(--app-accent)' }}>
+                      {isUploadingStudio ? 'Загрузка...' : 'Выбрать файл и загрузить'}
+                    </button>
+                    <input type="file" ref={studioAudioRef} hidden accept="audio/*" onChange={handleStudioUpload} />
+                  </div>
+                  <p className="text-xs text-center text-red-400 mt-2">Внимание! Вы можете загрузить только 1 трек за всё время.</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -324,7 +310,7 @@ export default function SettingsView({ onViewProfile }: any) {
           {subPage === 'currency' && (
             <div className="p-6 rounded-3xl liquid-glass text-center">
               <div className="text-6xl mb-4">🍃</div>
-              <p className="text-4xl font-bold mb-2" style={{ color: 'var(--app-text)' }}>{profile?.leaves || 0}</p>
+              <p className="text-4xl font-bold mb-2" style={{ color: 'var(--app-text)' }}>{(profile as any)?.leaf_balance || 0}</p>
               <p className="text-sm mb-6" style={{ color: 'var(--app-text-muted)' }}>Ваш баланс листиков</p>
               <button onClick={() => showError('Пополнение временно недоступно')} className="w-full py-3 rounded-xl font-bold text-white liquid-glass" style={{ background: 'var(--app-accent)' }}>Пополнить</button>
             </div>
@@ -341,4 +327,4 @@ export default function SettingsView({ onViewProfile }: any) {
       </AnimatePresence>
     </div>
   );
-                    }
+            }
