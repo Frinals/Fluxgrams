@@ -13,6 +13,7 @@ import UserProfileModal from '@/components/UserProfileModal';
 import FeedView from '@/components/FeedView';
 import CallsView from '@/components/CallsView';
 import CallScreen from '@/components/CallScreen';
+import MusicView from '@/components/MusicView'; // <-- ДОБАВИЛИ МУЗЫКУ
 import { useCall } from '@/hooks/useCall';
 import { useNotifications } from '@/hooks/useNotifications';
 
@@ -38,19 +39,33 @@ function MessengerApp() {
   const [postText, setPostText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
 
+  // Подключаем уведомления и звонки
   useNotifications();
   const { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute } = useCall();
 
-  const simulateIncoming = () => {
+  // Имитация входящего звонка для теста баннера
+  const simulateIncoming = useCallback(() => {
     window.dispatchEvent(new CustomEvent('fakeIncomingCall'));
+  }, []);
+
+  const handleOpenProfile = useCallback((id: string) => setViewingProfileId(id), []);
+  const handleOpenChat = useCallback((chatId: string, peer: any) => setOpenChat({ chatId, peer }), []);
+
+  const handleCreatePost = async () => {
+    if (!postText.trim() || !user) return;
+    setIsPosting(true);
+    await supabase.from('user_posts').insert({ user_id: user.id, content: postText });
+    setPostText(''); 
+    setShowPostModal(false);
+    setIsPosting(false);
+    setViewingProfileId(user.id); // Открываем свой профиль после поста
   };
 
-  // Если идет загрузка сессии (проверка пароля)
+  // Красивый экран загрузки (не дает зависнуть на мобильном интернете)
   if (loading) return (
     <div className="h-[100dvh] flex flex-col items-center justify-center bg-black">
       <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
       <p className="text-white font-bold text-lg">Подключение...</p>
-      <p className="text-gray-500 text-sm mt-2">Проверяем сеть</p>
     </div>
   );
   
@@ -59,7 +74,7 @@ function MessengerApp() {
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden relative" style={{ background: 'var(--app-bg)' }}>
       
-      {/* БАННЕР ЗВОНКА */}
+      {/* 1. БАННЕР ВХОДЯЩЕГО ЗВОНКА (Сверху экрана) */}
       <AnimatePresence>
         {callState === 'incoming' && (
           <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-4 left-4 right-4 z-[99999] rounded-3xl p-4 shadow-2xl flex items-center justify-between liquid-glass">
@@ -73,20 +88,21 @@ function MessengerApp() {
               </div>
             </div>
             <div className="flex gap-2">
-              <button onClick={endCall} className="w-11 h-11 rounded-full bg-red-500 flex items-center justify-center text-white">✖</button>
-              <button onClick={acceptCall} className="w-11 h-11 rounded-full bg-green-500 flex items-center justify-center text-white">📞</button>
+              <button onClick={endCall} className="w-11 h-11 rounded-full bg-red-500 flex items-center justify-center text-white active:scale-90">✖</button>
+              <button onClick={acceptCall} className="w-11 h-11 rounded-full bg-green-500 flex items-center justify-center text-white active:scale-90">📞</button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ПОЛНОЭКРАННЫЙ ЗВОНОК */}
+      {/* 2. ПОЛНОЭКРАННЫЙ ЗВОНОК */}
       <AnimatePresence>
         {(callState === 'calling' || callState === 'active') && (
           <CallScreen callState={callState} peer={remotePeer || { display_name: 'Собеседник' }} isMuted={isMuted} toggleMute={toggleMute} endCall={endCall} />
         )}
       </AnimatePresence>
 
+      {/* 3. ОСНОВНОЙ КОНТЕНТ */}
       <div className="flex-1 relative overflow-hidden">
         {openChat ? (
           <ChatView 
@@ -95,39 +111,49 @@ function MessengerApp() {
             group={null} 
             onBack={() => setOpenChat(null)} 
             onCall={() => startCall(openChat.peer)} 
-            onViewProfile={(id: string) => setViewingProfileId(id)} 
+            onViewProfile={handleOpenProfile} 
           />
         ) : (
           <>
-            {activeTab === 'chats' && <ChatList onOpenChat={(c, p) => setOpenChat({ chatId: c, peer: p })} onViewProfile={(id) => setViewingProfileId(id)} />}
-            {activeTab === 'calls' && <CallsView onTestBanner={simulateIncoming} onOpenChat={(c, p) => setOpenChat({ chatId: c, peer: p })} onViewProfile={(id) => setViewingProfileId(id)} />}
-            {activeTab === 'feed' && <FeedView onViewProfile={(id) => setViewingProfileId(id)} />}
-            {activeTab === 'settings' && <SettingsView onViewProfile={(id) => setViewingProfileId(id)} />}
+            {activeTab === 'chats' && <ChatList onOpenChat={handleOpenChat} onViewProfile={handleOpenProfile} />}
+            {activeTab === 'calls' && <CallsView onTestBanner={simulateIncoming} />}
+            {activeTab === 'feed' && <FeedView onViewProfile={handleOpenProfile} />}
+            {activeTab === 'music' && <MusicView />} {/* <-- НОВАЯ ВКЛАДКА МУЗЫКИ */}
+            {activeTab === 'settings' && <SettingsView onViewProfile={handleOpenProfile} />}
           </>
         )}
       </div>
 
+      {/* 4. НИЖНЯЯ ПАНЕЛЬ */}
       {!openChat && <BottomNav active={activeTab} onChange={setActiveTab} onCreatePost={() => setShowPostModal(true)} />}
 
+      {/* 5. МОДАЛКА ПРОФИЛЯ */}
       <AnimatePresence>
         {viewingProfileId && <UserProfileModal profileId={viewingProfileId} onClose={() => setViewingProfileId(null)} />}
       </AnimatePresence>
 
+      {/* 6. МОДАЛКА СОЗДАНИЯ ПОСТА */}
       <AnimatePresence>
         {showPostModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowPostModal(false)}>
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="rounded-3xl p-5 w-full max-w-md liquid-glass" onClick={e => e.stopPropagation()}>
               <h2 className="font-bold text-xl mb-4" style={{ color: 'var(--app-text)' }}>Новый пост</h2>
-              <textarea value={postText} onChange={e => setPostText(e.target.value)} placeholder="О чем думаешь?" className="w-full h-32 p-4 rounded-2xl outline-none border text-[16px]" style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }} />
+              <textarea 
+                value={postText} 
+                onChange={e => setPostText(e.target.value)} 
+                placeholder="О чем думаешь?" 
+                className="w-full h-32 p-4 rounded-2xl outline-none border text-[16px]" 
+                style={{ background: 'rgba(0,0,0,0.1)', color: 'var(--app-text)', borderColor: 'var(--app-border)' }} 
+              />
               <div className="flex gap-3 mt-4">
                 <button onClick={() => setShowPostModal(false)} className="flex-1 py-3 rounded-2xl font-semibold" style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--app-text)' }}>Отмена</button>
-                <button onClick={async () => {
-                  if (!postText.trim()) return;
-                  setIsPosting(true);
-                  await supabase.from('user_posts').insert({ user_id: user.id, content: postText });
-                  setPostText(''); setShowPostModal(false); setIsPosting(false); setViewingProfileId(user.id);
-                }} disabled={isPosting || !postText.trim()} className="flex-1 py-3 rounded-2xl font-semibold text-white disabled:opacity-50" style={{ background: 'var(--app-accent)' }}>
-                  {isPosting ? '...' : 'Опубликовать'}
+                <button 
+                  onClick={handleCreatePost} 
+                  disabled={isPosting || !postText.trim()} 
+                  className="flex-1 py-3 rounded-2xl font-semibold text-white disabled:opacity-50 active:scale-95 transition-transform" 
+                  style={{ background: 'var(--app-accent)' }}
+                >
+                  {isPosting ? 'Публикация...' : 'Опубликовать'}
                 </button>
               </div>
             </motion.div>
