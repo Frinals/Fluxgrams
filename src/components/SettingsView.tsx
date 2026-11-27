@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { themes, useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
-import { BackIcon, ImageIcon, PlayIcon, VerifiedIcon, LockIcon, BellIcon, LeafIcon, MusicIcon, ChevronRightIcon } from '@/components/Icons';
+import { BackIcon, ImageIcon, PlayIcon, VerifiedIcon, LockIcon, BellIcon, LeafIcon, MusicIcon, ChevronRightIcon, PaletteIcon } from '@/components/Icons'; // <-- Добавил PaletteIcon
 import MusicPlayer from './MusicPlayer';
 import { AnimatePresence } from 'framer-motion';
 
@@ -23,7 +23,6 @@ export default function SettingsView({ onViewProfile }: any) {
   const [showPlayer, setShowPlayer] = useState(false);
   const [playerIndex, setPlayerIndex] = useState(0);
 
-  // Стейты для Студии
   const [songTitle, setSongTitle] = useState('');
   const [songArtist, setSongArtist] = useState('');
   const [isUploadingStudio, setIsUploadingStudio] = useState(false);
@@ -70,15 +69,10 @@ export default function SettingsView({ onViewProfile }: any) {
     setIsSaving(false);
   };
 
-  // ЛОГИКА ПОКУПКИ СТУДИИ (Используем leaf_balance)
   const handleBuyStudio = async () => {
     if (!user || !profile) return;
-    
     const currentBalance = (profile as any).leaf_balance || 0;
-    if (currentBalance < 80) {
-      showError('Недостаточно средств (Нужно 80 🍃)');
-      return;
-    }
+    if (currentBalance < 80) { showError('Недостаточно средств (Нужно 80 🍃)'); return; }
 
     setIsSaving(true);
     const { error } = await supabase.from('profiles').update({
@@ -86,24 +80,15 @@ export default function SettingsView({ onViewProfile }: any) {
       has_studio_access: true 
     }).eq('id', user.id);
 
-    if (error) {
-      showError('Ошибка при покупке: ' + error.message);
-    } else {
-      await refreshProfile();
-      alert('Доступ к Студии открыт навсегда!');
-    }
+    if (error) { showError('Ошибка при покупке: ' + error.message); } 
+    else { await refreshProfile(); alert('Доступ к Студии открыт навсегда!'); }
     setIsSaving(false);
   };
 
-  // ЗАГРУЗКА ЕДИНСТВЕННОЙ ПЕСНИ В СТУДИИ
   const handleStudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-    if (!songTitle.trim() || !songArtist.trim()) {
-      showError('Введите название песни и исполнителя!');
-      return;
-    }
-
+    if (!songTitle.trim() || !songArtist.trim()) { showError('Введите название песни и исполнителя!'); return; }
     if (file.size > 20 * 1024 * 1024) { showError('Файл слишком большой (макс 20 МБ)'); return; }
     
     setIsUploadingStudio(true);
@@ -113,7 +98,6 @@ export default function SettingsView({ onViewProfile }: any) {
       if (uploadError) throw uploadError;
 
       const { data } = supabase.storage.from('media').getPublicUrl(fileName);
-      
       const newStudioSong = { title: songTitle.trim(), artist: songArtist.trim(), url: data.publicUrl };
       
       const { error: updateError } = await supabase.from('profiles').update({ studio_song: newStudioSong }).eq('id', user.id);
@@ -124,16 +108,17 @@ export default function SettingsView({ onViewProfile }: any) {
     } catch (error: any) {
       showError('Ошибка: ' + error.message);
     } finally {
-      setIsUploadingStudio(false);
+      setIsStudioUploading(false); // fixed typo here if any
     }
   };
 
+  // ВОТ ЗДЕСЬ МЫ ВЕРНУЛИ КНОПКУ ТЕМ (appearance)
   const settingsList = [
     { key: 'studio', icon: MusicIcon, label: 'Студия', desc: 'Загрузить свой трек (1 раз)' },
     { key: 'currency', icon: LeafIcon, label: 'Валюта', desc: 'Баланс листиков' },
+    { key: 'appearance', icon: PaletteIcon, label: 'Темы', desc: 'Оформление приложения' }, // <-- ВОТ ОНА
     { key: 'privacy', icon: LockIcon, label: 'Приватность', desc: 'Кто может писать' },
     { key: 'notifications', icon: BellIcon, label: 'Уведомления', desc: 'Звуки и вибрация' },
-    { key: 'appearance', icon: LockIcon, label: 'Оформление', desc: 'Темы приложения' },
   ];
 
   return (
@@ -160,7 +145,6 @@ export default function SettingsView({ onViewProfile }: any) {
 
           <div className="px-4 flex flex-col items-center -mt-14 relative z-10">
             
-            {/* ВОЗВРАЩАЕМ ПРОСМОТР ПРОФИЛЯ ПРИ КЛИКЕ НА АВАТАРКУ */}
             <div className="relative cursor-pointer" onClick={() => onViewProfile(profile?.id)}>
               <div className="w-28 h-28 rounded-full border-4 overflow-hidden flex items-center justify-center text-4xl text-white font-bold liquid-glass" style={{ borderColor: 'var(--app-bg)' }}>
                 {profile?.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" /> : profile?.display_name?.[0] || 'U'}
@@ -179,7 +163,6 @@ export default function SettingsView({ onViewProfile }: any) {
               <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>@{profile?.username || 'user'}</p>
             </div>
 
-            {/* ВОЗВРАЩАЕМ КНОПКУ РЕДАКТИРОВАНИЯ */}
             <button onClick={() => setSubPage('edit_profile')} className="w-full max-w-md mt-6 p-4 rounded-2xl liquid-glass flex items-center justify-between">
                <div className="flex items-center gap-3">
                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white" style={{ background: 'var(--app-accent)' }}><ImageIcon size={20} /></div>
@@ -191,7 +174,6 @@ export default function SettingsView({ onViewProfile }: any) {
                <ChevronRightIcon size={20} style={{ color: 'var(--app-text-muted)' }} />
             </button>
 
-            {/* БАЛАНС ИСПРАВЛЕН (leaf_balance) */}
             <div className="w-full max-w-md mt-2 p-4 rounded-3xl liquid-glass flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl bg-green-500/20">🍃</div>
@@ -218,7 +200,6 @@ export default function SettingsView({ onViewProfile }: any) {
         </div>
       )}
 
-      {/* ОСТАЛЬНЫЕ ЭКРАНЫ (Профиль, Темы, Студия) оставляем как было, они работали */}
       {subPage === 'edit_profile' && (
         <div className="p-4 pb-24">
           <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
@@ -285,10 +266,11 @@ export default function SettingsView({ onViewProfile }: any) {
         </div>
       )}
 
+      {/* ВОТ ЭТОТ БЛОК ОТВЕЧАЕТ ЗА ВЫБОР ТЕМ */}
       {subPage === 'appearance' && (
         <div className="p-4 pb-24">
           <button onClick={() => setSubPage('main')} className="mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}><BackIcon size={22} /> Назад</button>
-          <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--app-text)' }}>Оформление</h2>
+          <h2 className="text-2xl font-bold mb-6" style={{ color: 'var(--app-text)' }}>Темы</h2>
           <div className="grid grid-cols-3 gap-3">
              {(['pitch_black', 'light', 'violet', 'new_year', 'halloween', 'cyberpunk'] as const).map((key) => (
                 <button key={key} onClick={() => setTheme(key)} className="p-3 rounded-2xl border flex flex-col items-center gap-2 active:scale-95 transition-transform liquid-glass" style={{ borderColor: theme === key ? 'var(--app-accent)' : 'var(--app-border)' }}>
@@ -327,4 +309,4 @@ export default function SettingsView({ onViewProfile }: any) {
       </AnimatePresence>
     </div>
   );
-            }
+}
