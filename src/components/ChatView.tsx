@@ -22,6 +22,7 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
     const { data } = await query;
     
     if (data) {
+      // Фильтруем сообщения, которые мы удалили у себя
       const visibleMsgs = data.filter(m => !m.deleted_for?.includes(user?.id));
       setMessages(visibleMsgs);
     }
@@ -35,9 +36,12 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
           setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new]);
         }
         if (payload.eventType === 'UPDATE') {
+          // Если сообщение удалили у всех (is_deleted: true)
           if (payload.new.is_deleted) {
             setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, is_deleted: true, content: 'Сообщение удалено', media_url: null } : m));
-          } else {
+          } 
+          // Если сообщение изменили
+          else {
             setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
           }
         }
@@ -55,7 +59,8 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
     setInput('');
     
     if (isEditing && selectedMsg) {
-      await supabase.from('messages').update({ content: text }).eq('id', selectedMsg.id);
+      const { error } = await supabase.from('messages').update({ content: text }).eq('id', selectedMsg.id);
+      if (error) alert('Ошибка редактирования: ' + error.message);
       setIsEditing(false); setSelectedMsg(null);
       return;
     }
@@ -63,17 +68,20 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
     const tempId = `temp-${Date.now()}`;
     setMessages(prev => [...prev, { id: tempId, sender_id: user.id, content: text, created_at: new Date().toISOString() }]);
     
-    const { data } = await supabase.from('messages').insert({ sender_id: user.id, content: text, chat_id: chatId, group_id: group?.id }).select().single();
+    const { data, error } = await supabase.from('messages').insert({ sender_id: user.id, content: text, chat_id: chatId, group_id: group?.id }).select().single();
+    if (error) alert('Ошибка отправки: ' + error.message);
     if (data) setMessages(prev => prev.map(m => m.id === tempId ? data : m));
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'audio') => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-    e.target.value = ''; 
+    e.target.value = ''; // Сбрасываем инпут
+    
     const fileName = `chat_media/${Date.now()}.${file.name.split('.').pop()}`;
-    const { error } = await supabase.storage.from('media').upload(fileName, file);
-    if (error) { alert('Ошибка загрузки: ' + error.message); return; }
+    const { error: uploadError } = await supabase.storage.from('media').upload(fileName, file);
+    
+    if (uploadError) { alert('Ошибка загрузки: ' + uploadError.message); return; }
     const { data } = supabase.storage.from('media').getPublicUrl(fileName);
     
     await supabase.from('messages').insert({ sender_id: user.id, content: file.name, media_url: data.publicUrl, media_type: type, chat_id: chatId, group_id: group?.id });
@@ -82,20 +90,37 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
   const deleteForMe = async () => {
     if (!selectedMsg || !user) return;
     const currentDeletedFor = selectedMsg.deleted_for || [];
-    await supabase.from('messages').update({ deleted_for: [...currentDeletedFor, user.id] }).eq('id', selectedMsg.id);
+    
+    // Мгновенно убираем с экрана
     setMessages(prev => prev.filter(m => m.id !== selectedMsg.id)); 
     setSelectedMsg(null);
+
+    const { error } = await supabase.from('messages').update({ deleted_for: [...currentDeletedFor, user.id] }).eq('id', selectedMsg.id);
+    if (error) {
+      console.error('Ошибка удаления у себя:', error);
+      loadMessages(); // Возвращаем сообщение, если произошла ошибка
+    }
   };
 
   const deleteForEveryone = async () => {
     if (!selectedMsg) return;
-    await supabase.from('messages').update({ is_deleted: true, content: 'Сообщение удалено', media_url: null }).eq('id', selectedMsg.id);
+    
+    // Мгновенно меняем текст на экране
+    setMessages(prev => prev.map(m => m.id === selectedMsg.id ? { ...m, is_deleted: true, content: 'Сообщение удалено', media_url: null } : m));
     setSelectedMsg(null);
+
+    const { error } = await supabase.from('messages').update({ is_deleted: true, content: 'Сообщение удалено', media_url: null }).eq('id', selectedMsg.id);
+    
+    if (error) {
+      alert('Ошибка удаления у всех: ' + error.message + '\nВозможно, нет прав в базе данных.');
+      loadMessages(); // Откатываем изменения
+    }
   };
 
   return (
     <div className="flex flex-col h-[100dvh]" style={{ background: 'var(--app-bg)' }}>
       
+      {/* Шапка */}
       <div className="flex items-center justify-between px-2 py-2 border-b z-20 liquid-glass">
         <button onClick={onBack} className="p-2 rounded-full active:scale-90 transition-transform" style={{ color: 'var(--app-text)' }}><BackIcon size={24} /></button>
         <div onClick={() => onViewProfile && onViewProfile(peer?.id)} className="flex flex-col items-center cursor-pointer">
@@ -107,10 +132,10 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
         <button onClick={() => onCall && onCall(peer)} className="p-2 rounded-full active:scale-90 transition-transform" style={{ color: 'var(--app-accent)' }}><PhoneIcon size={22} /></button>
       </div>
 
-      {/* ЗОНА СООБЩЕНИЙ С ПАУТИНОЙ НА ФОНЕ */}
+      {/* Лента сообщений */}
       <div className="flex-1 overflow-y-auto p-4 relative">
         
-        {/* ВОТ ЗДЕСЬ ПАУТИНА НА ВЕСЬ ЭКРАН */}
+        {/* ПАУТИНА НА ФОНЕ (Хэллоуин) */}
         <div className="chat-cobweb-overlay">
           <div className="cobweb-full"></div>
           <div className="spider">🕷️</div>
@@ -134,23 +159,24 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
         </div>
       </div>
 
+      {/* Меню действий с сообщением */}
       <AnimatePresence>
         {selectedMsg && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedMsg(null)}>
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="rounded-3xl p-2 w-full max-w-xs liquid-glass overflow-hidden" onClick={e => e.stopPropagation()}>
               
-              {selectedMsg.sender_id === user?.id && (
-                <button onClick={() => { setIsEditing(true); setInput(selectedMsg.content); setSelectedMsg(null); }} className="w-full flex items-center gap-3 p-4 text-white hover:bg-white/10 rounded-2xl">
+              {selectedMsg.sender_id === user?.id && !selectedMsg.is_deleted && (
+                <button onClick={() => { setIsEditing(true); setInput(selectedMsg.content); setSelectedMsg(null); }} className="w-full flex items-center gap-3 p-4 hover:bg-white/10 rounded-2xl transition-colors" style={{ color: 'var(--app-text)' }}>
                   <EditIcon size={20} /> <span className="font-semibold">Изменить</span>
                 </button>
               )}
 
-              <button onClick={deleteForMe} className="w-full flex items-center gap-3 p-4 text-red-500 hover:bg-white/10 rounded-2xl">
+              <button onClick={deleteForMe} className="w-full flex items-center gap-3 p-4 text-red-500 hover:bg-white/10 rounded-2xl transition-colors">
                 <TrashIcon size={20} /> <span className="font-semibold">Удалить у себя</span>
               </button>
 
-              {selectedMsg.sender_id === user?.id && (
-                <button onClick={deleteForEveryone} className="w-full flex items-center gap-3 p-4 text-red-600 hover:bg-white/10 rounded-2xl">
+              {selectedMsg.sender_id === user?.id && !selectedMsg.is_deleted && (
+                <button onClick={deleteForEveryone} className="w-full flex items-center gap-3 p-4 text-red-600 hover:bg-white/10 rounded-2xl transition-colors">
                   <TrashIcon size={20} /> <span className="font-semibold">Удалить у всех</span>
                 </button>
               )}
@@ -160,16 +186,32 @@ export default function ChatView({ chatId, peer, group, onBack, onCall, onViewPr
         )}
       </AnimatePresence>
 
+      {/* Поле ввода */}
       <div className="p-2 pb-safe liquid-glass flex items-center gap-2">
-        <button onClick={() => imageInputRef.current?.click()} className="p-2 rounded-full active:scale-90" style={{ color: 'var(--app-text-muted)' }}><ImageIcon size={24} /></button>
+        {/* ФОТО (ГАЛЕРЕЯ) */}
+        <button onClick={() => imageInputRef.current?.click()} className="p-2 rounded-full active:scale-90 transition-transform" style={{ color: 'var(--app-text-muted)' }}>
+          <ImageIcon size={24} />
+        </button>
         <input type="file" ref={imageInputRef} hidden accept="image/*" onChange={(e) => handleFileUpload(e, 'image')} />
 
-        <button onClick={() => musicInputRef.current?.click()} className="p-2 rounded-full active:scale-90" style={{ color: 'var(--app-text-muted)' }}><MusicIcon size={24} /></button>
+        {/* МУЗЫКА (ФАЙЛЫ) */}
+        <button onClick={() => musicInputRef.current?.click()} className="p-2 rounded-full active:scale-90 transition-transform" style={{ color: 'var(--app-text-muted)' }}>
+          <MusicIcon size={24} />
+        </button>
         <input type="file" ref={musicInputRef} hidden accept="audio/*" onChange={(e) => handleFileUpload(e, 'audio')} />
 
-        <input type="text" value={input} onChange={e => setInput(e.target.value)} placeholder="Сообщение..." className="flex-1 px-4 py-2.5 rounded-2xl outline-none" style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--app-text)' }} />
+        <input 
+          type="text" 
+          value={input} 
+          onChange={e => setInput(e.target.value)} 
+          placeholder="Сообщение..." 
+          className="flex-1 px-4 py-2.5 rounded-2xl outline-none" 
+          style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--app-text)' }} 
+        />
         
-        <button onClick={handleSend} className="p-2.5 rounded-full text-white active:scale-90" style={{ background: 'var(--app-accent)' }}><SendIcon size={20} /></button>
+        <button onClick={handleSend} className="p-2.5 rounded-full text-white active:scale-90 transition-transform" style={{ background: 'var(--app-accent)' }}>
+          <SendIcon size={20} />
+        </button>
       </div>
     </div>
   );
