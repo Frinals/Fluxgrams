@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
-import { PlayIcon, PauseIcon, VerifiedIcon, XIcon, GiftAnimation } from '@/components/Icons';
+import { PlayIcon, PauseIcon, VerifiedIcon, XIcon } from '@/components/Icons';
+import GiftAnimation from './GiftAnimation';
 
 export default function UserProfileModal({ profileId, onClose }: any) {
   const [profile, setProfile] = useState<any>(null);
@@ -12,7 +13,7 @@ export default function UserProfileModal({ profileId, onClose }: any) {
   const [activeTab, setActiveTab] = useState<'posts' | 'gifts'>('posts');
   const [userPosts, setUserPosts] = useState<any[]>([]);
 
-  // 1. Загрузка подарков
+  // Загрузка подарков
   const [userGifts, setUserGifts] = useState<any[]>([]);
   const [selectedGift, setSelectedGift] = useState<any>(null);
 
@@ -27,7 +28,6 @@ export default function UserProfileModal({ profileId, onClose }: any) {
       const { data: postsData } = await supabase.from('user_posts').select('*').eq('user_id', profileId).order('created_at', { ascending: false });
       if (postsData) setUserPosts(postsData);
 
-      // Внутри fetchData добавил загрузку подарков:
       const { data: giftsData } = await supabase.from('gifts').select('*').eq('receiver_id', profileId).order('created_at', { ascending: false });
       if (giftsData) setUserGifts(giftsData);
 
@@ -136,7 +136,6 @@ export default function UserProfileModal({ profileId, onClose }: any) {
                   )}
                 </div>
               )}
-              {/* 2. Новый рендер вкладки 'gifts' */}
               {activeTab === 'gifts' && (
                 <div className="grid grid-cols-2 gap-4">
                   {userGifts.length === 0 ? (
@@ -155,7 +154,6 @@ export default function UserProfileModal({ profileId, onClose }: any) {
           </div>
         </div>
 
-        {/* 3. Модалка просмотра подарка */}
         {selectedGift && (
           <div className="fixed inset-0 z-[99999] bg-black/80 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setSelectedGift(null)}>
             <div className="p-6 rounded-3xl liquid-glass text-center max-w-xs w-full" onClick={e => e.stopPropagation()}>
