@@ -13,46 +13,38 @@ export function useCall() {
   const channelRef = useRef<any>(null);
   const remoteOfferRef = useRef<any>(null);
   const callStateRef = useRef(callState);
+  const iceCandidatesQueue = useRef<any[]>([]);
 
   useEffect(() => { callStateRef.current = callState; }, [callState]);
 
-  // 1. Слушаем входящие звонки на СВОЕЙ частоте (calls:user.id)
   useEffect(() => {
     if (!user) return;
     const channel = supabase.channel(`calls:${user.id}`);
     
     channel.on('broadcast', { event: 'incoming_call' }, async (payload) => {
-      // ЕСЛИ УЖЕ ЗАНЯТ - ШЛЕМ ОТКАЗ ЗВОНЯЩЕМУ
-      if (callStateRef.current !== 'idle') {
-        const busyChannel = supabase.channel(`calls:${payload.payload.from}`);
-        busyChannel.subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            busyChannel.send({ type: 'broadcast', event: 'call_busy' });
-            setTimeout(() => supabase.removeChannel(busyChannel), 2000);
-          }
-        });
-        return;
-      }
-
+      if (callStateRef.current !== 'idle') return; // Игнорируем, если заняты
       remoteOfferRef.current = payload.payload.sdp;
       const { data } = await supabase.from('profiles').select('*').eq('id', payload.payload.from).single();
       setRemotePeer(data || { id: payload.payload.from, display_name: 'Пользователь' });
       setCallState('incoming');
     });
 
-    channel.on('broadcast', { event: 'call_busy' }, () => {
-      alert('Абонент занят или уже разговаривает.');
-      setCallState('idle');
-    });
-
     channel.on('broadcast', { event: 'call_accepted' }, async (payload) => {
       setCallState('active');
-      if (pcRef.current) await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.payload.sdp));
+      if (pcRef.current) {
+        await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.payload.sdp));
+        // Применяем накопленные ICE-кандидаты
+        iceCandidatesQueue.current.forEach(c => pcRef.current?.addIceCandidate(c));
+        iceCandidatesQueue.current = [];
+      }
     });
 
     channel.on('broadcast', { event: 'ice_candidate' }, async (payload) => {
-      if (pcRef.current) {
-        try { await pcRef.current.addIceCandidate(new RTCIceCandidate(payload.payload.candidate)); } catch (e) {}
+      const candidate = new RTCIceCandidate(payload.payload.candidate);
+      if (pcRef.current && pcRef.current.remoteDescription) {
+        await pcRef.current.addIceCandidate(candidate);
+      } else {
+        iceCandidatesQueue.current.push(candidate);
       }
     });
 
@@ -61,52 +53,33 @@ export function useCall() {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
-  // 2. Совершаем звонок (Отправляем сигнал В КОМНАТУ СОБЕСЕДНИКА)
   const startCall = useCallback(async (peer: any) => {
     if (!user) return;
     setCallState('calling');
     setRemotePeer(peer);
-    
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     setLocalStream(stream);
     
     const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
     pcRef.current = pc;
-    
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
     
-    pc.onicecandidate = (event) => { 
-      if (event.candidate && peer) {
-        const peerChannel = supabase.channel(`calls:${peer.id}`);
-        peerChannel.subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            peerChannel.send({ type: 'broadcast', event: 'ice_candidate', payload: { candidate: event.candidate } });
-          }
-        });
-      }
+    pc.onicecandidate = (event) => {
+      if (event.candidate) channelRef.current?.send({ type: 'broadcast', event: 'ice_candidate', payload: { candidate: event.candidate, to: peer.id } });
     };
-    
+
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-
-    // Создаем канал для СОБЕСЕДНИКА и отправляем туда сигнал!
+    
     const peerChannel = supabase.channel(`calls:${peer.id}`);
     peerChannel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        peerChannel.send({ 
-          type: 'broadcast', 
-          event: 'incoming_call', 
-          payload: { from: user.id, sdp: offer } 
-        });
-      }
+      if (status === 'SUBSCRIBED') peerChannel.send({ type: 'broadcast', event: 'incoming_call', payload: { from: user.id, sdp: offer } });
     });
   }, [user]);
 
-  // 3. Принимаем звонок (Отправляем ответ В КОМНАТУ ЗВОНЯЩЕГО)
   const acceptCall = useCallback(async () => {
     if (!remotePeer || !user || !remoteOfferRef.current) return;
     setCallState('active');
-    
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     setLocalStream(stream);
     
@@ -114,44 +87,33 @@ export function useCall() {
     pcRef.current = pc;
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
     
-    pc.onicecandidate = (event) => { 
-      if (event.candidate && remotePeer) {
-         const callerChannel = supabase.channel(`calls:${remotePeer.id}`);
-         callerChannel.subscribe((status) => {
-           if (status === 'SUBSCRIBED') {
-             callerChannel.send({ type: 'broadcast', event: 'ice_candidate', payload: { candidate: event.candidate } });
-           }
-         });
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        const callerChannel = supabase.channel(`calls:${remotePeer.id}`);
+        callerChannel.subscribe(s => s === 'SUBSCRIBED' && callerChannel.send({ type: 'broadcast', event: 'ice_candidate', payload: { candidate: event.candidate } }));
       }
     };
 
     await pc.setRemoteDescription(new RTCSessionDescription(remoteOfferRef.current));
+    iceCandidatesQueue.current.forEach(c => pc.addIceCandidate(c));
+    iceCandidatesQueue.current = [];
+
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
-
+    
     const callerChannel = supabase.channel(`calls:${remotePeer.id}`);
-    callerChannel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        callerChannel.send({ type: 'broadcast', event: 'call_accepted', payload: { sdp: answer } });
-      }
-    });
+    callerChannel.subscribe(s => s === 'SUBSCRIBED' && callerChannel.send({ type: 'broadcast', event: 'call_accepted', payload: { sdp: answer } }));
   }, [remotePeer, user]);
 
   const toggleMute = useCallback(() => {
-    if (localStream) {
-      localStream.getAudioTracks().forEach(track => { track.enabled = !track.enabled; });
-      setIsMuted(prev => !prev);
-    }
-  }, [localStream]);
+    localStream?.getAudioTracks().forEach(track => { track.enabled = !track.enabled; });
+    setIsMuted(!isMuted);
+  }, [localStream, isMuted]);
 
   const endCall = useCallback(() => {
     pcRef.current?.close();
     localStream?.getTracks().forEach(t => t.stop());
-    setCallState('idle');
-    setLocalStream(null);
-    setRemotePeer(null);
-    setIsMuted(false);
-    remoteOfferRef.current = null;
+    setCallState('idle'); setLocalStream(null); setRemotePeer(null); setIsMuted(false);
   }, [localStream]);
 
   return { callState, remotePeer, isMuted, startCall, acceptCall, endCall, toggleMute };
