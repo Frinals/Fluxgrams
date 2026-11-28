@@ -1,9 +1,9 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
 
 export const themes = {
   pitch_black: { bg: '#000000', surface: 'rgba(20, 20, 20, 0.6)', text: '#ffffff', muted: '#666666', border: 'rgba(255,255,255,0.1)', accent: '#3b82f6' },
   light: { bg: '#f3f4f6', surface: 'rgba(255, 255, 255, 0.6)', text: '#111827', muted: '#6b7280', border: 'rgba(0,0,0,0.1)', accent: '#2563eb' },
-  violet: { bg: '#0b0312', surface: 'rgba(60, 20, 100, 0.5)', text: '#ffffff', muted: '#b58bff', border: 'rgba(180, 100, 255, 0.3)', accent: '#8b5cf6' }, // <-- НОВАЯ ТЕМА
+  violet: { bg: '#0b0312', surface: 'rgba(60, 20, 100, 0.5)', text: '#ffffff', muted: '#b58bff', border: 'rgba(180, 100, 255, 0.3)', accent: '#8b5cf6' },
   new_year: { bg: '#0a192f', surface: 'rgba(17, 34, 64, 0.6)', text: '#ffffff', muted: '#8892b0', border: 'rgba(35, 53, 84, 0.5)', accent: '#64ffda' }, 
   halloween: { bg: '#0a0505', surface: 'rgba(40, 15, 10, 0.6)', text: '#ff9900', muted: '#cc5500', border: 'rgba(255, 153, 0, 0.2)', accent: '#ff5500' },
   cyberpunk: { bg: '#050510', surface: 'rgba(15, 0, 30, 0.6)', text: '#00f0ff', muted: '#ff007f', border: 'rgba(255, 0, 127, 0.4)', accent: '#ff007f' },
@@ -11,13 +11,7 @@ export const themes = {
 };
 
 type ThemeKeys = keyof typeof themes;
-
-interface ThemeContextValue {
-  theme: ThemeKeys;
-  setTheme: (t: ThemeKeys) => void;
-}
-
-const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+const ThemeContext = createContext<{ theme: ThemeKeys; setTheme: (t: ThemeKeys) => void } | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<ThemeKeys>(() => {
@@ -28,8 +22,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem('app_theme', theme);
     const t = themes[theme];
-    if (!t) return;
-    
     const root = document.documentElement;
     root.setAttribute('data-theme', theme);
     root.style.setProperty('--app-bg', t.bg);
@@ -38,27 +30,34 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty('--app-text-muted', t.muted);
     root.style.setProperty('--app-border', t.border);
     root.style.setProperty('--app-accent', t.accent);
-    
     document.body.style.backgroundColor = t.bg;
-    document.body.style.color = t.text;
+  }, [theme]);
+
+  // ФИКС СНЕГА (Генерируем 1 раз при включении)
+  const snowParticles = useMemo(() => {
+    if (theme !== 'new_year') return null;
+    return Array.from({ length: 60 }).map((_, i) => (
+      <div key={i} className="snow-particle" style={{ 
+        left: `${Math.random() * 100}%`, 
+        width: `${Math.random() * 5 + 2}px`, 
+        height: `${Math.random() * 5 + 2}px`, 
+        filter: Math.random() > 0.5 ? `blur(${Math.random() * 2 + 1}px)` : 'none', 
+        animationDuration: `${Math.random() * 6 + 7}s`, 
+        animationDelay: `${Math.random() * 8}s` 
+      }} />
+    ));
   }, [theme]);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>
-      {theme === 'new_year' && (
-        <div className="snow-container">
-          {Array.from({ length: 50 }).map((_, i) => (
-            <div key={i} className="snow-particle" style={{ left: `${Math.random() * 100}%`, width: `${Math.random() * 5 + 2}px`, height: `${Math.random() * 5 + 2}px`, filter: Math.random() > 0.5 ? `blur(${Math.random() * 2 + 1}px)` : 'none', animationDuration: `${Math.random() * 6 + 7}s`, animationDelay: `${Math.random() * 8}s` }} />
-          ))}
-        </div>
-      )}
+      {snowParticles && <div className="snow-container">{snowParticles}</div>}
       {children}
     </ThemeContext.Provider>
   );
 }
 
-export function useTheme() {
+export const useTheme = () => {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error('useTheme must be used within ThemeProvider');
   return ctx;
-}
+};
