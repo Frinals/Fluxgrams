@@ -33,10 +33,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     document.body.style.backgroundColor = t.bg;
   }, [theme]);
 
-  // ФИКС СНЕГА (Генерируем 1 раз при включении)
+  // СНЕГ (Генерация 1 раз при включении, фикс краша)
   const snowParticles = useMemo(() => {
     if (theme !== 'new_year') return null;
-    return Array.from({ length: 60 }).map((_, i) => (
+    return Array.from({ length: 50 }).map((_, i) => (
       <div key={i} className="snow-particle" style={{ 
         left: `${Math.random() * 100}%`, 
         width: `${Math.random() * 5 + 2}px`, 
