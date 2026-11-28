@@ -1,17 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
-import { PlayIcon, PauseIcon, VerifiedIcon, XIcon } from '@/components/Icons';
+import { PlayIcon, PauseIcon, VerifiedIcon, XIcon, GiftAnimation } from '@/components/Icons';
 
 export default function UserProfileModal({ profileId, onClose }: any) {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  
+
   const [activeTab, setActiveTab] = useState<'posts' | 'gifts'>('posts');
   const [userPosts, setUserPosts] = useState<any[]>([]);
-  
+
+  // 1. Загрузка подарков
+  const [userGifts, setUserGifts] = useState<any[]>([]);
+  const [selectedGift, setSelectedGift] = useState<any>(null);
+
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
@@ -19,10 +23,14 @@ export default function UserProfileModal({ profileId, onClose }: any) {
     const fetchData = async () => {
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', profileId).single();
       if (profileData) setProfile(profileData);
-      
+
       const { data: postsData } = await supabase.from('user_posts').select('*').eq('user_id', profileId).order('created_at', { ascending: false });
       if (postsData) setUserPosts(postsData);
-      
+
+      // Внутри fetchData добавил загрузку подарков:
+      const { data: giftsData } = await supabase.from('gifts').select('*').eq('receiver_id', profileId).order('created_at', { ascending: false });
+      if (giftsData) setUserGifts(giftsData);
+
       setLoading(false);
     };
     fetchData();
@@ -53,7 +61,7 @@ export default function UserProfileModal({ profileId, onClose }: any) {
         initial={{ y: '100%' }} 
         animate={{ y: 0 }} 
         exit={{ y: '100%' }} 
-        transition={{ type: 'tween', ease: 'easeOut', duration: 0.3 }} // ЛЕГКАЯ АНИМАЦИЯ
+        transition={{ type: 'tween', ease: 'easeOut', duration: 0.3 }}
         className="w-full h-[90vh] rounded-t-[2.5rem] overflow-y-auto relative bg-[#0f1115]"
         onClick={e => e.stopPropagation()}
       >
@@ -128,14 +136,42 @@ export default function UserProfileModal({ profileId, onClose }: any) {
                   )}
                 </div>
               )}
+              {/* 2. Новый рендер вкладки 'gifts' */}
               {activeTab === 'gifts' && (
-                <div className="text-center py-6">
-                  <p className="text-sm text-gray-500">Пока нет подарков 🎁</p>
+                <div className="grid grid-cols-2 gap-4">
+                  {userGifts.length === 0 ? (
+                    <p className="text-center col-span-2 py-6 text-sm" style={{ color: 'var(--app-text-muted)' }}>Пока нет подарков 🎁</p>
+                  ) : (
+                    userGifts.map(gift => (
+                      <div key={gift.id} onClick={() => setSelectedGift(gift)} className="p-4 rounded-2xl liquid-glass flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform">
+                        <GiftAnimation size={80} />
+                        <p className="text-xs mt-2 font-bold" style={{ color: 'var(--app-text)' }}>От: {gift.sender_name}</p>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
             </div>
           </div>
         </div>
+
+        {/* 3. Модалка просмотра подарка */}
+        {selectedGift && (
+          <div className="fixed inset-0 z-[99999] bg-black/80 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setSelectedGift(null)}>
+            <div className="p-6 rounded-3xl liquid-glass text-center max-w-xs w-full" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-center mb-4">
+                <GiftAnimation size={150} />
+              </div>
+              <h3 className="text-xl font-bold mb-1" style={{ color: 'var(--app-text)' }}>Сердце со стрелой</h3>
+              <p className="text-sm font-bold mb-2 text-blue-400">От: {selectedGift.sender_name}</p>
+              <p className="text-xs mb-4" style={{ color: 'var(--app-text-muted)' }}>
+                {new Date(selectedGift.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+              </p>
+              <p className="bg-white/10 p-4 rounded-xl italic mb-6" style={{ color: 'var(--app-text)' }}>"{selectedGift.message}"</p>
+              <button onClick={() => setSelectedGift(null)} className="w-full py-3 rounded-xl font-bold text-white liquid-glass" style={{ background: 'var(--app-accent)' }}>Закрыть</button>
+            </div>
+          </div>
+        )}
       </motion.div>
     </div>
   );
